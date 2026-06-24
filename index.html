@@ -37,6 +37,7 @@ button.scan{background:#00c896;color:#000;border:none;border-radius:8px;padding:
 .poly-link{color:#0087ff}
 .msg{color:#666;text-align:center;padding:40px 16px;background:#12121a;border-radius:12px;line-height:1.8}
 .err{color:#ff4757;background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px}
+.warn{color:#f59e0b;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px}
 .alert-bar{background:rgba(0,200,150,.1);border:1px solid rgba(0,200,150,.3);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#00c896}
 .ticker{position:fixed;bottom:0;left:0;right:0;background:#12121a;border-top:1px solid #2a2a3d;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px}
 .ticker-info{font-size:12px;color:#666;font-family:monospace;flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
@@ -106,7 +107,8 @@ button.scan{background:#00c896;color:#000;border:none;border-radius:8px;padding:
 </div>
 
 <script>
-var scanCount = 0;
+var scanCount=0;
+var debugLog=[];
 
 document.getElementById('cats').addEventListener('click',function(e){
   var b=e.target.closest('[data-c]');
@@ -116,156 +118,147 @@ document.getElementById('cats').addEventListener('click',function(e){
 function getCategories(){return Array.from(document.querySelectorAll('#cats [data-c].on')).map(function(b){return b.dataset.c});}
 function setStatus(live,text){document.getElementById('dot').className='tdot'+(live?' live':'');document.getElementById('ttext').textContent=text;}
 function setProgress(pct,text){document.getElementById('progText').textContent=text;document.getElementById('progFill').style.width=pct+'%';}
+function log(msg){debugLog.push(msg);console.log('[PredEdge] '+msg);}
 
-var STOP_WORDS = new Set(['the','and','for','will','this','that','with','from','are','has',
+var STOP_WORDS=new Set(['the','and','for','will','this','that','with','from','are','has',
   'was','have','been','which','who','what','when','where','how','can','not','but',
   'its','his','her','they','them','their','our','your','you','may','per','than',
   'more','most','any','all','one','two','three','over','under','yes','win','wins']);
 
-function normalize(s) {
+function normalize(s){
   return (s||'').toLowerCase()
-    .replace(/\bbtc\b/g,'bitcoin')
-    .replace(/\beth\b/g,'ethereum')
-    .replace(/\bsol\b/g,'solana')
-    .replace(/\bxrp\b/g,'ripple')
-    .replace(/\bgop\b/g,'republican')
-    .replace(/\bdems?\b/g,'democrat')
-    .replace(/\bpotus\b/g,'president')
-    .replace(/\bus\b/g,'united states')
-    .replace(/\buk\b/g,'united kingdom')
-    .replace(/\bnba\b/g,'nba basketball')
-    .replace(/\bnfl\b/g,'nfl football')
-    .replace(/[^a-z0-9 ]/g,' ')
-    .replace(/\s+/g,' ').trim();
+    .replace(/\bbtc\b/g,'bitcoin').replace(/\beth\b/g,'ethereum')
+    .replace(/\bsol\b/g,'solana').replace(/\bxrp\b/g,'ripple')
+    .replace(/\bgop\b/g,'republican').replace(/\bdems?\b/g,'democrat')
+    .replace(/\bpotus\b/g,'president').replace(/\bus\b/g,'united states')
+    .replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
 }
 
-function keywords(s) {
-  return new Set(normalize(s).split(' ').filter(function(w){
-    return w.length > 2 && !STOP_WORDS.has(w);
-  }));
+function keywords(s){
+  return new Set(normalize(s).split(' ').filter(function(w){return w.length>2&&!STOP_WORDS.has(w);}));
 }
 
-function similarity(a, b) {
-  var wa = keywords(a);
-  var wb = keywords(b);
-  if (!wa.size || !wb.size) return 0;
-  var inter = 0;
-  wa.forEach(function(w){ if(wb.has(w)) inter++; });
-  var union = wa.size + wb.size - inter;
-  var jaccard = inter / union;
-  function bigrams(words) {
-    var arr = Array.from(words);
-    var bg = new Set();
-    for (var i=0; i<arr.length-1; i++) bg.add(arr[i]+' '+arr[i+1]);
-    return bg;
-  }
-  var ba = bigrams(wa), bb = bigrams(wb);
-  var bInter = 0;
-  ba.forEach(function(g){ if(bb.has(g)) bInter++; });
-  var bigramBonus = (ba.size+bb.size > 0) ? bInter / Math.max(ba.size, bb.size) * 0.3 : 0;
-  var entityBoost = 0;
-  wa.forEach(function(w){
-    if (w.length > 5 && wb.has(w)) entityBoost += 0.1;
-  });
-  return Math.min(1, jaccard + bigramBonus + entityBoost);
+function similarity(a,b){
+  var wa=keywords(a),wb=keywords(b);
+  if(!wa.size||!wb.size) return 0;
+  var inter=0;
+  wa.forEach(function(w){if(wb.has(w))inter++;});
+  var jaccard=inter/(wa.size+wb.size-inter);
+  var entityBoost=0;
+  wa.forEach(function(w){if(w.length>5&&wb.has(w))entityBoost+=0.1;});
+  return Math.min(1,jaccard+entityBoost);
 }
 
-async function fetchWithFallback(url) {
-  var proxies = [
+async function fetchJSON(url,label){
+  var attempts=[
+    url,
     'https://corsproxy.io/?'+encodeURIComponent(url),
     'https://api.allorigins.win/raw?url='+encodeURIComponent(url),
-    'https://thingproxy.freeboard.io/fetch/'+url,
-    url
+    'https://cors-anywhere.herokuapp.com/'+url,
+    'https://proxy.cors.sh/'+url
   ];
-  for (var pi=0; pi<proxies.length; pi++) {
-    try {
-      var controller = new AbortController();
-      var tid = setTimeout(function(){ controller.abort(); }, 12000);
-      var res = await fetch(proxies[pi], {signal: controller.signal});
+  for(var i=0;i<attempts.length;i++){
+    try{
+      log((label||'fetch')+' attempt '+(i===0?'direct':'proxy'+i));
+      var controller=new AbortController();
+      var tid=setTimeout(function(){controller.abort();},15000);
+      var res=await fetch(attempts[i],{signal:controller.signal,headers:i===0?{'Accept':'application/json'}:{}});
       clearTimeout(tid);
-      if (res.ok) return JSON.parse(await res.text());
-    } catch(e) {}
+      if(res.ok){
+        var text=await res.text();
+        var data=JSON.parse(text);
+        log((label||'fetch')+' OK via '+(i===0?'direct':'proxy'+i));
+        return data;
+      } else {
+        log((label||'fetch')+' HTTP '+res.status+' via '+(i===0?'direct':'proxy'+i));
+      }
+    }catch(e){log((label||'fetch')+' error: '+e.message);}
   }
+  log((label||'fetch')+' ALL FAILED');
   return null;
 }
 
-async function fetchKalshi(categories) {
-  var allMarkets = [], cursor = '';
-  for (var page=0; page<8; page++) {
-    var url = 'https://external-api.kalshi.com/trade-api/v2/markets?status=open&limit=200'+(cursor?'&cursor='+cursor:'');
+async function fetchKalshi(categories){
+  var allMarkets=[],cursor='';
+  for(var page=0;page<8;page++){
+    var url='https://external-api.kalshi.com/trade-api/v2/markets?status=open&limit=200'+(cursor?'&cursor='+cursor:'');
     setProgress(5+page*3,'Fetching Kalshi... '+allMarkets.length+' markets');
-    var data = await fetchWithFallback(url);
-    if (!data || !data.markets || !data.markets.length) break;
-    allMarkets = allMarkets.concat(data.markets);
-    if (!data.cursor || data.markets.length < 200) break;
-    cursor = data.cursor;
+    var data=await fetchJSON(url,'kalshi-p'+page);
+    if(!data||!data.markets||!data.markets.length) break;
+    allMarkets=allMarkets.concat(data.markets);
+    if(!data.cursor||data.markets.length<200) break;
+    cursor=data.cursor;
   }
-  return allMarkets.filter(function(m) {
-    if (m.status !== 'active') return false;
-    var combined = ((m.category||'')+(m.title||'')).toLowerCase();
-    var cats = categories;
-    if (cats.indexOf('sports') > -1 && /sport|nba|nfl|mlb|nhl|soccer|tennis|golf|ufc|mma|playoff|champion/.test(combined)) return true;
-    if (cats.indexOf('politics') > -1 && /polit|elect|senate|congress|president|vote|democrat|republican|trump|harris/.test(combined)) return true;
-    if (cats.indexOf('crypto') > -1 && /crypto|bitcoin|btc|eth|solana|xrp|coin|token|blockchain/.test(combined)) return true;
-    if (cats.indexOf('economics') > -1 && /econ|financ|fed|rate|inflation|gdp|unemploy|cpi|stock|nasdaq|dow/.test(combined)) return true;
-    if (cats.indexOf('other') > -1) return true;
-    return cats.length === 0;
+  log('Kalshi total before filter: '+allMarkets.length);
+  return allMarkets.filter(function(m){
+    if(m.status!=='active') return false;
+    var combined=((m.category||'')+(m.title||'')).toLowerCase();
+    var cats=categories;
+    if(cats.indexOf('sports')>-1&&/sport|nba|nfl|mlb|nhl|soccer|tennis|golf|ufc|mma|playoff|champion/.test(combined)) return true;
+    if(cats.indexOf('politics')>-1&&/polit|elect|senate|congress|president|vote|democrat|republican|trump|harris/.test(combined)) return true;
+    if(cats.indexOf('crypto')>-1&&/crypto|bitcoin|btc|eth|solana|xrp|coin|token|blockchain/.test(combined)) return true;
+    if(cats.indexOf('economics')>-1&&/econ|financ|fed|rate|inflation|gdp|unemploy|cpi|stock|nasdaq|dow/.test(combined)) return true;
+    if(cats.indexOf('other')>-1) return true;
+    return cats.length===0;
   });
 }
 
-async function fetchPolymarket() {
-  var allMarkets = [], offset = 0;
-  for (var page=0; page<5; page++) {
-    var url = 'https://gamma-api.polymarket.com/markets?closed=false&limit=500&offset='+offset+'&order=volume&ascending=false&active=true';
+async function fetchPolymarket(){
+  var allMarkets=[],offset=0;
+  for(var page=0;page<5;page++){
+    var url='https://gamma-api.polymarket.com/markets?closed=false&limit=500&offset='+offset+'&order=volume&ascending=false&active=true';
     setProgress(35+page*5,'Fetching Polymarket... '+allMarkets.length+' markets');
-    var data = await fetchWithFallback(url);
-    if (!data || !Array.isArray(data) || !data.length) break;
-    allMarkets = allMarkets.concat(data);
-    offset += 500;
-    if (data.length < 500) break;
+    var data=await fetchJSON(url,'poly-p'+page);
+    if(!data||!Array.isArray(data)||!data.length) break;
+    allMarkets=allMarkets.concat(data);
+    offset+=500;
+    if(data.length<500) break;
   }
-  return allMarkets.filter(function(m){ return m.active && !m.closed && m.outcomePrices && m.outcomes; });
+  log('Polymarket total: '+allMarkets.length);
+  return allMarkets.filter(function(m){return m.active&&!m.closed&&m.outcomePrices&&m.outcomes;});
 }
 
-function getCatBadge(title) {
-  var t = (title||'').toLowerCase();
-  if (/nba|nfl|mlb|nhl|wnba|soccer|tennis|golf|ufc|mma|epl|world cup|champion|playoff|super bowl/.test(t)) return '<span class="catbadge cat-sports">🏆 Sports</span>';
-  if (/bitcoin|btc|eth|crypto|coin|token|blockchain|defi|sol|xrp/.test(t)) return '<span class="catbadge cat-crypto">₿ Crypto</span>';
-  if (/elect|president|senate|congress|governor|vote|poll|democrat|republican|trump|biden|harris/.test(t)) return '<span class="catbadge cat-politics">🗳️ Politics</span>';
-  if (/fed|rate|inflation|gdp|unemploy|cpi|job|economic|stock|dow|nasdaq|s&p/.test(t)) return '<span class="catbadge cat-economics">📈 Economics</span>';
+function getCatBadge(t){
+  t=(t||'').toLowerCase();
+  if(/nba|nfl|mlb|nhl|wnba|soccer|tennis|golf|ufc|mma|epl|world cup|champion|playoff|super bowl/.test(t)) return '<span class="catbadge cat-sports">🏆 Sports</span>';
+  if(/bitcoin|btc|eth|crypto|coin|token|blockchain|sol|xrp/.test(t)) return '<span class="catbadge cat-crypto">₿ Crypto</span>';
+  if(/elect|president|senate|congress|governor|vote|democrat|republican|trump|harris/.test(t)) return '<span class="catbadge cat-politics">🗳️ Politics</span>';
+  if(/fed|rate|inflation|gdp|unemploy|cpi|economic|stock|dow|nasdaq/.test(t)) return '<span class="catbadge cat-economics">📈 Economics</span>';
   return '<span class="catbadge cat-other">🌐 Other</span>';
 }
 
-function buildPolyIndex(polyMarkets) {
-  var index = {};
-  polyMarkets.forEach(function(pm, i) {
-    keywords(pm.question||pm.title||'').forEach(function(w) {
-      if (!index[w]) index[w] = [];
+function buildPolyIndex(polyMarkets){
+  var index={};
+  polyMarkets.forEach(function(pm,i){
+    keywords(pm.question||pm.title||'').forEach(function(w){
+      if(!index[w])index[w]=[];
       index[w].push(i);
     });
   });
   return index;
 }
 
-function findBestMatch(kTitle, polyMarkets, polyIndex, simThresh) {
-  var scores = {};
-  keywords(kTitle).forEach(function(w) {
-    if (polyIndex[w]) polyIndex[w].forEach(function(i){ scores[i]=(scores[i]||0)+1; });
+function findBestMatch(kTitle,polyMarkets,polyIndex,simThresh){
+  var scores={};
+  keywords(kTitle).forEach(function(w){
+    if(polyIndex[w]) polyIndex[w].forEach(function(i){scores[i]=(scores[i]||0)+1;});
   });
-  var bestMatch = null, bestSim = 0;
-  Object.keys(scores).forEach(function(i) {
-    var sim = similarity(kTitle, polyMarkets[i].question||polyMarkets[i].title||'');
-    if (sim > bestSim && sim >= simThresh) { bestSim = sim; bestMatch = polyMarkets[i]; }
+  var bestMatch=null,bestSim=0;
+  Object.keys(scores).forEach(function(i){
+    var sim=similarity(kTitle,polyMarkets[i].question||polyMarkets[i].title||'');
+    if(sim>bestSim&&sim>=simThresh){bestSim=sim;bestMatch=polyMarkets[i];}
   });
-  return { match: bestMatch, sim: bestSim };
+  return {match:bestMatch,sim:bestSim};
 }
 
-async function startScan() {
-  var bank = parseFloat(document.getElementById('bank').value)||1000;
-  var min = parseFloat(document.getElementById('mine').value)||0.2;
-  var simThresh = parseFloat(document.getElementById('simThresh').value)||0.15;
-  var categories = getCategories();
-  if (!categories.length) { document.getElementById('out').innerHTML='<div class="err">Select at least one category.</div>'; return; }
+async function startScan(){
+  var bank=parseFloat(document.getElementById('bank').value)||1000;
+  var min=parseFloat(document.getElementById('mine').value)||0.2;
+  var simThresh=parseFloat(document.getElementById('simThresh').value)||0.15;
+  var categories=getCategories();
+  debugLog=[];
+
+  if(!categories.length){document.getElementById('out').innerHTML='<div class="err">Select at least one category.</div>';return;}
 
   scanCount++;
   setStatus(true,'scanning...');
@@ -273,47 +266,46 @@ async function startScan() {
   setProgress(0,'Starting...');
   document.getElementById('out').innerHTML='';
 
-  try {
-    var kalshiMarkets = await fetchKalshi(categories);
-    var polyMarkets = await fetchPolymarket();
+  try{
+    var kalshiMarkets=await fetchKalshi(categories);
+    var polyMarkets=await fetchPolymarket();
+
     setProgress(65,'Building index...');
-    var polyIndex = buildPolyIndex(polyMarkets);
+    var polyIndex=buildPolyIndex(polyMarkets);
     setProgress(70,'Scanning for arbs...');
 
-    var arbs = [], matchCount = 0;
+    var arbs=[],matchCount=0;
 
-    kalshiMarkets.forEach(function(km) {
-      var kTitle = (km.yes_sub_title||km.title||'').trim();
-      var kYes = parseFloat(km.yes_bid_dollars||0);
-      var kNo = parseFloat(km.no_bid_dollars||0);
-      if (!kYes||!kNo||kYes<=0.01||kYes>=0.99) return;
+    kalshiMarkets.forEach(function(km){
+      var kTitle=(km.yes_sub_title||km.title||'').trim();
+      var kYes=parseFloat(km.yes_bid_dollars||0);
+      var kNo=parseFloat(km.no_bid_dollars||0);
+      if(!kYes||!kNo||kYes<=0.01||kYes>=0.99) return;
 
-      var r = findBestMatch(kTitle, polyMarkets, polyIndex, simThresh);
-      if (!r.match) return;
+      var r=findBestMatch(kTitle,polyMarkets,polyIndex,simThresh);
+      if(!r.match) return;
       matchCount++;
 
-      var pm = r.match;
-      var pPrices = [];
-      try { pPrices = JSON.parse(pm.outcomePrices||'[]'); } catch(e){}
-      var pOutcomes = [];
-      try { pOutcomes = JSON.parse(pm.outcomes||'[]'); } catch(e){}
-      if (pOutcomes.length < 2 || pPrices.length < 2) return;
-      var pYes = parseFloat(pPrices[0]||0), pNo = parseFloat(pPrices[1]||0);
-      if (!pYes||!pNo) return;
+      var pm=r.match;
+      var pPrices=[]; try{pPrices=JSON.parse(pm.outcomePrices||'[]');}catch(e){}
+      var pOutcomes=[]; try{pOutcomes=JSON.parse(pm.outcomes||'[]');}catch(e){}
+      if(pOutcomes.length<2||pPrices.length<2) return;
+      var pYes=parseFloat(pPrices[0]||0),pNo=parseFloat(pPrices[1]||0);
+      if(!pYes||!pNo) return;
 
-      var cat = getCatBadge(kTitle+' '+(pm.question||''));
-      [[kYes,pNo,'YES','NO'],[kNo,pYes,'NO','YES']].forEach(function(combo) {
+      var cat=getCatBadge(kTitle+' '+(pm.question||''));
+      [[kYes,pNo,'YES','NO'],[kNo,pYes,'NO','YES']].forEach(function(combo){
         var kP=combo[0],pP=combo[1],kS=combo[2],pS=combo[3];
-        var tot = kP+pP, edge = (1-tot)*100;
-        if (edge >= min && tot < 1.0) {
-          var profit = (bank/tot)-bank;
-          arbs.push({ kTitle:kTitle, pTitle:pm.question||pm.title||'', sim:r.sim,
-            edge:edge, roi:(profit/bank)*100, profit:profit,
+        var tot=kP+pP,edge=(1-tot)*100;
+        if(edge>=min&&tot<1.0){
+          var profit=(bank/tot)-bank;
+          arbs.push({kTitle:kTitle,pTitle:pm.question||pm.title||'',sim:r.sim,
+            edge:edge,roi:(profit/bank)*100,profit:profit,
             closeTime:km.close_time||pm.endDate,
-            kalshiSide:kS, kalshiPrice:kP, kalshiStake:bank*(kP/tot),
-            polySide:pS, polyPrice:pP, polyStake:bank*(pP/tot),
-            kalshiTicker:km.ticker, polySlug:pm.slug||pm.id,
-            polyVolume:pm.volume, category:cat });
+            kalshiSide:kS,kalshiPrice:kP,kalshiStake:bank*(kP/tot),
+            polySide:pS,polyPrice:pP,polyStake:bank*(pP/tot),
+            kalshiTicker:km.ticker,polySlug:pm.slug||pm.id,
+            polyVolume:pm.volume,category:cat});
         }
       });
     });
@@ -322,50 +314,54 @@ async function startScan() {
     setProgress(100,'Done');
     document.getElementById('prog').style.display='none';
 
-    var now = new Date().toLocaleTimeString();
-    var h = '<div class="stats">Scan #'+scanCount+' · '+kalshiMarkets.length+' Kalshi · '+polyMarkets.length+' Poly · '+matchCount+' matched · '+arbs.length+' arbs · '+now+'</div>';
+    var now=new Date().toLocaleTimeString();
+    var warnings='';
+    if(kalshiMarkets.length===0) warnings+='<div class="warn">⚠️ Kalshi returned 0 markets — API may be temporarily blocked. Try again in a minute.<br><small>'+debugLog.slice(0,6).join(' | ')+'</small></div>';
+    if(polyMarkets.length<200) warnings+='<div class="warn">⚠️ Only '+polyMarkets.length+' Polymarket markets loaded. Proxy may be slow.</div>';
 
-    if (arbs.length) {
-      h += '<div class="alert-bar">⚡ '+arbs.length+' arb'+(arbs.length>1?'s':'')+' found at '+now+'</div>';
-      arbs.forEach(function(x) {
-        var simPct = Math.round(x.sim*100);
-        var closeStr = x.closeTime ? new Date(x.closeTime).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}) : '';
-        h += '<div class="card'+(x.edge>2?' hot':'')+'">';
-        h += '<div class="ctop"><div style="flex:1;min-width:0">';
-        h += x.category;
-        if (simPct < 50) h += '<span class="sim-badge">⚠️ '+simPct+'% match</span>';
-        h += '<div class="gtitle">Kalshi: '+x.kTitle+'</div>';
-        h += '<div class="gtitle" style="color:#666;font-size:11px;margin-top:2px">Poly: '+x.pTitle+'</div>';
-        if (closeStr) h += '<div class="close-time">⏱ Closes: '+closeStr+'</div>';
-        if (x.polyVolume) h += '<div class="vol">Poly vol: $'+Number(x.polyVolume).toLocaleString(undefined,{maximumFractionDigits:0})+'</div>';
-        h += '</div><div style="text-align:right;flex-shrink:0">';
-        h += '<div class="roi">+'+x.roi.toFixed(2)+'%</div>';
-        h += '<div class="psub">$'+x.profit.toFixed(2)+' profit</div>';
-        h += '<div class="psub">'+simPct+'% match</div>';
-        h += '</div></div>';
-        h += '<div class="sides">';
-        h += '<div class="side"><div class="platform kalshi-color">Kalshi</div>';
-        h += '<div class="team">'+x.kalshiSide+'</div>';
-        h += '<div class="price kalshi-color">'+(x.kalshiPrice*100).toFixed(0)+'¢</div>';
-        h += '<div class="stake">Bet $'+x.kalshiStake.toFixed(2)+'</div>';
-        h += '<a href="https://kalshi.com/markets/'+x.kalshiTicker.toLowerCase()+'" target="_blank" class="open-link kalshi-link">Open Kalshi →</a></div>';
-        h += '<div class="side"><div class="platform poly-color">Polymarket</div>';
-        h += '<div class="team">'+x.polySide+'</div>';
-        h += '<div class="price poly-color">'+(x.polyPrice*100).toFixed(0)+'¢</div>';
-        h += '<div class="stake">Bet $'+x.polyStake.toFixed(2)+'</div>';
-        if (x.polySlug) h += '<a href="https://polymarket.com/event/'+x.polySlug+'" target="_blank" class="open-link poly-link">Open Poly →</a>';
-        h += '</div></div></div>';
+    var h=warnings+'<div class="stats">Scan #'+scanCount+' · '+kalshiMarkets.length+' Kalshi · '+polyMarkets.length+' Poly · '+matchCount+' matched · '+arbs.length+' arbs · '+now+'</div>';
+
+    if(arbs.length){
+      h+='<div class="alert-bar">⚡ '+arbs.length+' arb'+(arbs.length>1?'s':'')+' found at '+now+'</div>';
+      arbs.forEach(function(x){
+        var simPct=Math.round(x.sim*100);
+        var closeStr=x.closeTime?new Date(x.closeTime).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+        h+='<div class="card'+(x.edge>2?' hot':'')+'">';
+        h+='<div class="ctop"><div style="flex:1;min-width:0">';
+        h+=x.category;
+        if(simPct<50) h+='<span class="sim-badge">⚠️ '+simPct+'% match</span>';
+        h+='<div class="gtitle">Kalshi: '+x.kTitle+'</div>';
+        h+='<div class="gtitle" style="color:#666;font-size:11px;margin-top:2px">Poly: '+x.pTitle+'</div>';
+        if(closeStr) h+='<div class="close-time">⏱ Closes: '+closeStr+'</div>';
+        if(x.polyVolume) h+='<div class="vol">Poly vol: $'+Number(x.polyVolume).toLocaleString(undefined,{maximumFractionDigits:0})+'</div>';
+        h+='</div><div style="text-align:right;flex-shrink:0">';
+        h+='<div class="roi">+'+x.roi.toFixed(2)+'%</div>';
+        h+='<div class="psub">$'+x.profit.toFixed(2)+' profit</div>';
+        h+='<div class="psub">'+simPct+'% match</div>';
+        h+='</div></div>';
+        h+='<div class="sides">';
+        h+='<div class="side"><div class="platform kalshi-color">Kalshi</div>';
+        h+='<div class="team">'+x.kalshiSide+'</div>';
+        h+='<div class="price kalshi-color">'+(x.kalshiPrice*100).toFixed(0)+'¢</div>';
+        h+='<div class="stake">Bet $'+x.kalshiStake.toFixed(2)+'</div>';
+        h+='<a href="https://kalshi.com/markets/'+x.kalshiTicker.toLowerCase()+'" target="_blank" class="open-link kalshi-link">Open Kalshi →</a></div>';
+        h+='<div class="side"><div class="platform poly-color">Polymarket</div>';
+        h+='<div class="team">'+x.polySide+'</div>';
+        h+='<div class="price poly-color">'+(x.polyPrice*100).toFixed(0)+'¢</div>';
+        h+='<div class="stake">Bet $'+x.polyStake.toFixed(2)+'</div>';
+        if(x.polySlug) h+='<a href="https://polymarket.com/event/'+x.polySlug+'" target="_blank" class="open-link poly-link">Open Poly →</a>';
+        h+='</div></div></div>';
       });
     } else {
-      h += '<div class="msg">No arbs found above '+min+'%.<br><br>'+matchCount+' markets matched.<br><br>Try lowering Min % to 0.1 or similarity to 0.1.</div>';
+      h+='<div class="msg">No arbs found above '+min+'%.<br><br>'+matchCount+' markets matched.<br><br>Try lowering Min % to 0.1 or similarity to 0.1.</div>';
     }
 
-    document.getElementById('out').innerHTML = h;
+    document.getElementById('out').innerHTML=h;
     setStatus(false,'Scan #'+scanCount+' · '+arbs.length+' arbs · '+now);
 
-  } catch(e) {
+  }catch(e){
     document.getElementById('prog').style.display='none';
-    document.getElementById('out').innerHTML='<div class="err">Error: '+e.message+'</div>';
+    document.getElementById('out').innerHTML='<div class="err">Error: '+e.message+'<br><small>'+debugLog.join(' | ')+'</small></div>';
     setStatus(false,'error');
   }
 }
