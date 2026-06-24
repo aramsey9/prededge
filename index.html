@@ -70,7 +70,7 @@ button.scan{background:#00c896;color:#000;border:none;border-radius:8px;padding:
 </div>
 <div class="row">
   <input type="number" id="bank" value="1000" placeholder="Bankroll $" />
-  <input type="number" id="mine" value="0.2" placeholder="Min %" step="0.1" />
+  <input type="number" id="mine" value="0.1" placeholder="Min %" step="0.1" />
 </div>
 <div class="slabel">Categories</div>
 <div class="cats" id="cats">
@@ -82,7 +82,7 @@ button.scan{background:#00c896;color:#000;border:none;border-radius:8px;padding:
 </div>
 <div class="slabel">Similarity threshold</div>
 <div class="row" style="margin-bottom:14px">
-  <input type="number" id="simThresh" value="0.15" step="0.05" min="0.05" max="1" placeholder="0.15" style="margin-bottom:0" />
+  <input type="number" id="simThresh" value="0.08" step="0.01" min="0.01" max="1" placeholder="0.08" style="margin-bottom:0" />
   <span style="color:#666;font-size:12px;padding:12px 0 0 4px">match score (lower = more results)</span>
 </div>
 <button class="scan" onclick="startScan()">🔍 Scan Arbs</button>
@@ -107,36 +107,59 @@ function log(msg){debugLog.push(msg);}
 
 async function fetchJSON(url,label){
   var proxies=[
-    {name:'cors1',url:function(u){return 'https://corsproxy.io/?'+encodeURIComponent(u);},parse:function(t){return JSON.parse(t);}},
-    {name:'cors2',url:function(u){return 'https://api.allorigins.win/get?url='+encodeURIComponent(u);},parse:function(t){var w=JSON.parse(t);return JSON.parse(w.contents);}},
-    {name:'cors3',url:function(u){return 'https://api.allorigins.win/raw?url='+encodeURIComponent(u);},parse:function(t){return JSON.parse(t);}},
-    {name:'cors4',url:function(u){return 'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(u);},parse:function(t){return JSON.parse(t);}},
+    {name:'c1',url:function(u){return 'https://corsproxy.io/?'+encodeURIComponent(u);},parse:function(t){return JSON.parse(t);}},
+    {name:'c2',url:function(u){return 'https://api.allorigins.win/get?url='+encodeURIComponent(u);},parse:function(t){var w=JSON.parse(t);return JSON.parse(w.contents);}},
+    {name:'c3',url:function(u){return 'https://api.allorigins.win/raw?url='+encodeURIComponent(u);},parse:function(t){return JSON.parse(t);}},
+    {name:'c4',url:function(u){return 'https://api.codetabs.com/v1/proxy?quest='+encodeURIComponent(u);},parse:function(t){return JSON.parse(t);}},
     {name:'direct',url:function(u){return u;},parse:function(t){return JSON.parse(t);}}
   ];
   for(var i=0;i<proxies.length;i++){
     var p=proxies[i];
     try{
-      log(label+' '+p.name);
       var ctrl=new AbortController();
       var tid=setTimeout(function(){ctrl.abort();},20000);
       var res=await fetch(p.url(url),{signal:ctrl.signal});
       clearTimeout(tid);
-      if(!res.ok){log(label+' '+p.name+' HTTP'+res.status);continue;}
+      if(!res.ok){log(label+' '+p.name+' '+res.status);continue;}
       var text=await res.text();
-      if(!text||text.length<5){log(label+' '+p.name+' empty');continue;}
+      if(!text||text.length<5)continue;
       var data=p.parse(text);
-      log(label+' '+p.name+' OK '+text.length+'b');
+      log(label+' '+p.name+' OK');
       return data;
-    }catch(e){log(label+' '+p.name+' ERR:'+e.message.slice(0,25));}
+    }catch(e){log(label+' '+p.name+' fail');}
   }
-  log(label+' ALLFAIL');
   return null;
 }
 
-var STOP=new Set(['the','and','for','will','this','that','with','from','are','has','was','have','been','which','who','what','when','where','how','can','not','but','its','his','her','they','them','their','our','your','you','may','per','than','more','most','any','all','one','two','three','over','under','yes','win','wins','does','did','would','should']);
-function normalize(s){return(s||'').toLowerCase().replace(/\bbtc\b/g,'bitcoin').replace(/\beth\b/g,'ethereum').replace(/\bsol\b/g,'solana').replace(/\bxrp\b/g,'ripple').replace(/\bgop\b/g,'republican').replace(/\bdems?\b/g,'democrat').replace(/\bpotus\b/g,'president').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();}
-function kw(s){return new Set(normalize(s).split(' ').filter(function(w){return w.length>2&&!STOP.has(w);}));}
-function similarity(a,b){var wa=kw(a),wb=kw(b);if(!wa.size||!wb.size)return 0;var inter=0;wa.forEach(function(w){if(wb.has(w))inter++;});var j=inter/(wa.size+wb.size-inter);var boost=0;wa.forEach(function(w){if(w.length>5&&wb.has(w))boost+=0.12;});return Math.min(1,j+boost);}
+var STOP=new Set(['the','and','for','will','this','that','with','from','are','has','was','have','been','who','what','when','where','how','can','not','but','its','they','their','you','may','per','than','more','most','any','all','over','under','does','did','would','should','about','into']);
+
+function norm(s){
+  return(s||'').toLowerCase()
+    .replace(/\bbtc\b/g,'bitcoin').replace(/\beth\b/g,'ethereum')
+    .replace(/\bsol\b/g,'solana').replace(/\bxrp\b/g,'ripple')
+    .replace(/\bdoge\b/g,'dogecoin').replace(/\bbnb\b/g,'binance')
+    .replace(/\bgop\b/g,'republican').replace(/\bdems?\b/g,'democrat')
+    .replace(/\bpotus\b/g,'president').replace(/\bvp\b/g,'vice president')
+    .replace(/\bdonald\b/g,'trump').replace(/\bkamala\b/g,'harris')
+    .replace(/\bchampionship\b/g,'champion').replace(/\bchampions\b/g,'champion')
+    .replace(/\bplayoffs?\b/g,'playoff').replace(/\bwinner\b/g,'win')
+    .replace(/\busa?\b/g,'united states').replace(/\buk\b/g,'united kingdom')
+    .replace(/\beu\b/g,'european union')
+    .replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+}
+
+function kw(s){return norm(s).split(' ').filter(function(w){return w.length>1&&!STOP.has(w);});}
+
+function similarity(a,b){
+  var wa=kw(a),wb=kw(b);
+  if(!wa.length||!wb.length)return 0;
+  var setB=new Set(wb),shared=0;
+  wa.forEach(function(w){if(setB.has(w))shared++;});
+  var score=shared/Math.min(wa.length,wb.length);
+  var bonus=0,setA=new Set(wa);
+  setB.forEach(function(w){if(w.length>5&&setA.has(w))bonus+=0.15;});
+  return Math.min(1,score+bonus);
+}
 
 async function fetchKalshi(cats){
   var all=[],cursor='';
@@ -163,27 +186,38 @@ async function fetchKalshi(cats){
 
 async function fetchPolymarket(){
   var all=[],offset=0;
-  var LIMIT=100,MAX_PAGES=10;
-  for(var page=0;page<MAX_PAGES;page++){
-    var url='https://gamma-api.polymarket.com/markets?closed=false&active=true&limit='+LIMIT+'&offset='+offset+'&order=volume&ascending=false';
+  for(var page=0;page<10;page++){
+    var url='https://gamma-api.polymarket.com/markets?closed=false&active=true&limit=100&offset='+offset+'&order=volume&ascending=false';
     setProgress(35+page*2,'Fetching Polymarket... '+all.length+' markets');
     var data=await fetchJSON(url,'P'+page);
     if(!data||!Array.isArray(data)||!data.length)break;
     all=all.concat(data);
-    offset+=LIMIT;
-    if(data.length<LIMIT)break;
+    offset+=100;
+    if(data.length<100)break;
   }
   return all.filter(function(m){return m.active&&!m.closed&&m.outcomePrices&&m.outcomes;});
 }
 
 function catBadge(t){t=(t||'').toLowerCase();if(/nba|nfl|mlb|nhl|wnba|soccer|tennis|golf|ufc|mma|epl|world cup|champion|playoff|super bowl/.test(t))return'<span class="catbadge cat-sports">🏆 Sports</span>';if(/bitcoin|btc|eth|crypto|coin|token|blockchain|sol|xrp/.test(t))return'<span class="catbadge cat-crypto">₿ Crypto</span>';if(/elect|president|senate|congress|governor|vote|democrat|republican|trump|harris/.test(t))return'<span class="catbadge cat-politics">🗳️ Politics</span>';if(/fed|rate|inflation|gdp|unemploy|cpi|economic|stock|dow|nasdaq/.test(t))return'<span class="catbadge cat-economics">📈 Economics</span>';return'<span class="catbadge cat-other">🌐 Other</span>';}
+
 function buildIndex(markets){var idx={};markets.forEach(function(m,i){kw(m.question||m.title||'').forEach(function(w){if(!idx[w])idx[w]=[];idx[w].push(i);});});return idx;}
-function bestMatch(title,markets,idx,thresh){var hits={};kw(title).forEach(function(w){if(idx[w])idx[w].forEach(function(i){hits[i]=(hits[i]||0)+1;});});var best=null,bestS=0;Object.keys(hits).forEach(function(i){var s=similarity(title,markets[i].question||markets[i].title||'');if(s>bestS&&s>=thresh){bestS=s;best=markets[i];}});return{match:best,sim:bestS};}
+
+function bestMatch(title,markets,idx,thresh){
+  var hits={};
+  kw(title).forEach(function(w){if(idx[w])idx[w].forEach(function(i){hits[i]=(hits[i]||0)+1;});});
+  var best=null,bestS=0;
+  Object.keys(hits).forEach(function(i){
+    if(hits[i]<2&&kw(title).length>3)return;
+    var s=similarity(title,markets[i].question||markets[i].title||'');
+    if(s>bestS&&s>=thresh){bestS=s;best=markets[i];}
+  });
+  return{match:best,sim:bestS};
+}
 
 async function startScan(){
   var bank=parseFloat(document.getElementById('bank').value)||1000;
-  var minEdge=parseFloat(document.getElementById('mine').value)||0.2;
-  var thresh=parseFloat(document.getElementById('simThresh').value)||0.15;
+  var minEdge=parseFloat(document.getElementById('mine').value)||0.1;
+  var thresh=parseFloat(document.getElementById('simThresh').value)||0.08;
   var cats=getCategories();
   debugLog=[];
   if(!cats.length){document.getElementById('out').innerHTML='<div class="err">Select at least one category.</div>';return;}
@@ -251,7 +285,7 @@ async function startScan(){
         h+='</div></div></div>';
       });
     }else{
-      h+='<div class="msg">No arbs found above '+minEdge+'%.<br><br>'+matched+' markets matched.<br><br>Try lowering Min % to 0.1 or similarity to 0.1.</div>';
+      h+='<div class="msg">No arbs found above '+minEdge+'%.<br><br>'+matched+' markets matched.<br><br>Try lowering Min % to 0 or similarity to 0.05.</div>';
     }
     document.getElementById('out').innerHTML=h;
     setStatus(false,'Scan #'+scanCount+' · '+arbs.length+' arbs · '+now);
