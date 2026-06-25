@@ -106,7 +106,11 @@ function setStatus(live,text){document.getElementById('dot').className='tdot'+(l
 function setProgress(pct,text){document.getElementById('progText').textContent=text;document.getElementById('progFill').style.width=pct+'%';}
 
 async function fetchJSON(url){
-  try{var res=await fetch(PROXY+encodeURIComponent(url));if(!res.ok)return null;return await res.json();}catch(e){return null;}
+  try{
+    var res=await fetch(PROXY+encodeURIComponent(url));
+    if(!res.ok)return null;
+    return await res.json();
+  }catch(e){return null;}
 }
 
 function cleanTitle(t){return(t||'').trim().replace(/^(yes|no)\s+/i,'').trim();}
@@ -125,7 +129,6 @@ function words(s){
     .replace(/\bbtc\b/g,'bitcoin').replace(/\beth\b/g,'ethereum')
     .replace(/\bsol\b/g,'solana').replace(/\bxrp\b/g,'ripple')
     .replace(/\bgop\b/g,'republican').replace(/\bpotus\b/g,'president')
-    .replace(/\bfed\b/g,'federal').replace(/\buk\b/g,'kingdom')
     .replace(/[^a-z0-9]/g,' ').split(' ')
     .filter(function(w){return w.length>2;});
 }
@@ -138,11 +141,11 @@ function similarity(a,b){
 }
 
 async function fetchKalshi(){
-  var all=[],cursor=null;
+  var all=[],cursor='';
   for(var page=0;page<12;page++){
     var url='https://external-api.kalshi.com/trade-api/v2/markets?status=open&limit=200';
-    if(cursor)url+='&cursor='+encodeURIComponent(cursor);
-    setProgress(5+page*2,'Fetching Kalshi... '+all.length+' markets');
+    if(cursor)url=url+'&cursor='+cursor;
+    setProgress(5+page*2,'Fetching Kalshi... '+all.length+' markets (page '+(page+1)+')');
     var data=await fetchJSON(url);
     if(!data||!data.markets||!data.markets.length)break;
     all=all.concat(data.markets);
@@ -165,7 +168,7 @@ async function fetchPolymarket(){
   return all.filter(function(m){return m.active&&!m.closed&&m.outcomePrices&&m.outcomes;});
 }
 
-function catBadge(t){t=(t||'').toLowerCase();if(/nba|nfl|mlb|nhl|wnba|soccer|tennis|golf|ufc|mma|epl|world cup|champion|playoff|super bowl|fifa/.test(t))return'<span class="catbadge cat-sports">🏆 Sports</span>';if(/bitcoin|btc|eth|crypto|coin|token|blockchain|sol|xrp/.test(t))return'<span class="catbadge cat-crypto">₿ Crypto</span>';if(/elect|president|senate|congress|governor|vote|democrat|republican|trump|harris/.test(t))return'<span class="catbadge cat-politics">🗳️ Politics</span>';if(/fed|rate|inflation|gdp|unemploy|cpi|economic|stock|dow|nasdaq|federal/.test(t))return'<span class="catbadge cat-economics">📈 Economics</span>';return'<span class="catbadge cat-other">🌐 Other</span>';}
+function catBadge(t){t=(t||'').toLowerCase();if(/nba|nfl|mlb|nhl|wnba|soccer|tennis|golf|ufc|mma|epl|world cup|champion|playoff|super bowl|fifa/.test(t))return'<span class="catbadge cat-sports">🏆 Sports</span>';if(/bitcoin|btc|eth|crypto|coin|token|blockchain|sol|xrp/.test(t))return'<span class="catbadge cat-crypto">₿ Crypto</span>';if(/elect|president|senate|congress|governor|vote|democrat|republican|trump|harris/.test(t))return'<span class="catbadge cat-politics">🗳️ Politics</span>';if(/fed|rate|inflation|gdp|unemploy|cpi|economic|stock|dow|nasdaq/.test(t))return'<span class="catbadge cat-economics">📈 Economics</span>';return'<span class="catbadge cat-other">🌐 Other</span>';}
 
 function buildIndex(markets){var idx={};markets.forEach(function(m,i){words(m.question||m.title||'').forEach(function(w){if(!idx[w])idx[w]=[];idx[w].push(i);});});return idx;}
 
@@ -222,6 +225,7 @@ async function startScan(){
     var now=new Date().toLocaleTimeString();
     var warns='';
     if(kalshi.length===0)warns+='<div class="warn">⚠️ Kalshi: 0 markets loaded.</div>';
+    if(kalshi.length<400)warns+='<div class="warn">⚠️ Only '+kalshi.length+' Kalshi markets loaded.</div>';
     if(poly.length<200)warns+='<div class="warn">⚠️ Polymarket: only '+poly.length+' markets.</div>';
     var h=warns+'<div class="stats">Scan #'+scanCount+' · '+kalshi.length+' Kalshi · '+poly.length+' Poly · '+matched+' matched · '+arbs.length+' arbs · '+now+'</div>';
     if(arbs.length){
