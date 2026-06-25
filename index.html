@@ -131,7 +131,7 @@ async function fetchJSON(url,label){
   return null;
 }
 
-var STOP=new Set(['the','and','for','will','this','that','with','from','are','has','was','have','been','who','what','when','where','how','can','not','but','its','they','their','you','may','per','than','more','most','any','all','over','under','does','did','would','should','about','into']);
+var STOP=new Set(['the','and','for','will','this','that','with','from','are','has','was','have','been','who','what','when','where','how','can','not','but','its','they','their','you','may','per','than','more','most','any','all','over','under','does','did','would','should','about','into','there','been','being']);
 
 function norm(s){
   return(s||'').toLowerCase()
@@ -141,10 +141,9 @@ function norm(s){
     .replace(/\bgop\b/g,'republican').replace(/\bdems?\b/g,'democrat')
     .replace(/\bpotus\b/g,'president').replace(/\bvp\b/g,'vice president')
     .replace(/\bdonald\b/g,'trump').replace(/\bkamala\b/g,'harris')
-    .replace(/\bchampionship\b/g,'champion').replace(/\bchampions\b/g,'champion')
-    .replace(/\bplayoffs?\b/g,'playoff').replace(/\bwinner\b/g,'win')
+    .replace(/\bchampionship[s]?\b/g,'champion').replace(/\bwinner[s]?\b/g,'win')
+    .replace(/\bplayoffs?\b/g,'playoff').replace(/\bfederal reserve\b/g,'fed')
     .replace(/\busa?\b/g,'united states').replace(/\buk\b/g,'united kingdom')
-    .replace(/\beu\b/g,'european union')
     .replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
 }
 
@@ -157,7 +156,7 @@ function similarity(a,b){
   wa.forEach(function(w){if(setB.has(w))shared++;});
   var score=shared/Math.min(wa.length,wb.length);
   var bonus=0,setA=new Set(wa);
-  setB.forEach(function(w){if(w.length>5&&setA.has(w))bonus+=0.15;});
+  setB.forEach(function(w){if(w.length>4&&setA.has(w))bonus+=0.15;});
   return Math.min(1,score+bonus);
 }
 
@@ -172,6 +171,9 @@ async function fetchKalshi(cats){
     if(!data.cursor||data.markets.length<200)break;
     cursor=data.cursor;
   }
+  log('Kalshi raw:'+all.length);
+  // Log first market to see field names
+  if(all.length>0)log('K fields:'+Object.keys(all[0]).join(','));
   return all.filter(function(m){
     if(m.status!=='active')return false;
     var c=((m.category||'')+' '+(m.title||'')).toLowerCase();
@@ -195,7 +197,25 @@ async function fetchPolymarket(){
     offset+=100;
     if(data.length<100)break;
   }
+  log('Poly raw:'+all.length);
+  if(all.length>0)log('P fields:'+Object.keys(all[0]).join(','));
   return all.filter(function(m){return m.active&&!m.closed&&m.outcomePrices&&m.outcomes;});
+}
+
+function kalshiPrice(m,side){
+  // Kalshi API returns prices in cents as integers (0-99)
+  // Fields: yes_bid, yes_ask, no_bid, no_ask, last_price
+  // Also sometimes: yes_bid_dollars (float) depending on API version
+  if(side==='yes'){
+    if(m.yes_bid_dollars!=null)return parseFloat(m.yes_bid_dollars);
+    if(m.yes_bid!=null)return parseFloat(m.yes_bid)/100;
+    if(m.last_price!=null)return parseFloat(m.last_price)/100;
+  }else{
+    if(m.no_bid_dollars!=null)return parseFloat(m.no_bid_dollars);
+    if(m.no_bid!=null)return parseFloat(m.no_bid)/100;
+    if(m.last_price!=null)return 1-(parseFloat(m.last_price)/100);
+  }
+  return 0;
 }
 
 function catBadge(t){t=(t||'').toLowerCase();if(/nba|nfl|mlb|nhl|wnba|soccer|tennis|golf|ufc|mma|epl|world cup|champion|playoff|super bowl/.test(t))return'<span class="catbadge cat-sports">🏆 Sports</span>';if(/bitcoin|btc|eth|crypto|coin|token|blockchain|sol|xrp/.test(t))return'<span class="catbadge cat-crypto">₿ Crypto</span>';if(/elect|president|senate|congress|governor|vote|democrat|republican|trump|harris/.test(t))return'<span class="catbadge cat-politics">🗳️ Politics</span>';if(/fed|rate|inflation|gdp|unemploy|cpi|economic|stock|dow|nasdaq/.test(t))return'<span class="catbadge cat-economics">📈 Economics</span>';return'<span class="catbadge cat-other">🌐 Other</span>';}
@@ -207,7 +227,6 @@ function bestMatch(title,markets,idx,thresh){
   kw(title).forEach(function(w){if(idx[w])idx[w].forEach(function(i){hits[i]=(hits[i]||0)+1;});});
   var best=null,bestS=0;
   Object.keys(hits).forEach(function(i){
-    if(hits[i]<2&&kw(title).length>3)return;
     var s=similarity(title,markets[i].question||markets[i].title||'');
     if(s>bestS&&s>=thresh){bestS=s;best=markets[i];}
   });
@@ -231,11 +250,14 @@ async function startScan(){
     setProgress(65,'Building index...');
     var idx=buildIndex(poly);
     setProgress(70,'Scanning for arbs...');
-    var arbs=[],matched=0;
+    var arbs=[],matched=0,skippedPrice=0;
     kalshi.forEach(function(km){
-      var kTitle=(km.yes_sub_title||km.title||'').trim();
-      var kYes=parseFloat(km.yes_bid_dollars||0),kNo=parseFloat(km.no_bid_dollars||0);
-      if(!kYes||!kNo||kYes<=0.01||kYes>=0.99)return;
+      // FIX 1: use km.title (full question), not km.yes_sub_title (short fragment)
+      var kTitle=(km.title||km.yes_sub_title||'').trim();
+      // FIX 2: use kalshiPrice() which handles both cents and dollars field formats
+      var kYes=kalshiPrice(km,'yes');
+      var kNo=kalshiPrice(km,'no');
+      if(!kYes||!kNo||kYes<=0.01||kYes>=0.99){skippedPrice++;return;}
       var r=bestMatch(kTitle,poly,idx,thresh);
       if(!r.match)return;
       matched++;
@@ -254,6 +276,7 @@ async function startScan(){
         }
       });
     });
+    log('skippedPrice:'+skippedPrice+' matched:'+matched);
     arbs.sort(function(a,b){return b.edge-a.edge;});
     setProgress(100,'Done');
     document.getElementById('prog').style.display='none';
@@ -291,7 +314,7 @@ async function startScan(){
     setStatus(false,'Scan #'+scanCount+' · '+arbs.length+' arbs · '+now);
   }catch(e){
     document.getElementById('prog').style.display='none';
-    document.getElementById('out').innerHTML='<div class="err">Error: '+e.message+'</div>';
+    document.getElementById('out').innerHTML='<div class="err">Error: '+e.message+'<br><small>'+debugLog.slice(-5).join(' | ')+'</small></div>';
     setStatus(false,'error');
   }
 }
