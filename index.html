@@ -82,7 +82,7 @@ button.scan{background:#00c896;color:#000;border:none;border-radius:8px;padding:
 </div>
 <div class="slabel">Similarity threshold</div>
 <div class="row" style="margin-bottom:14px">
-  <input type="number" id="simThresh" value="0.08" step="0.01" min="0.01" max="1" placeholder="0.08" style="margin-bottom:0" />
+  <input type="number" id="simThresh" value="0.25" step="0.05" min="0.05" max="1" placeholder="0.25" style="margin-bottom:0" />
   <span style="color:#666;font-size:12px;padding:12px 0 0 4px">match score (lower = more results)</span>
 </div>
 <button class="scan" onclick="startScan()">🔍 Scan Arbs</button>
@@ -106,11 +106,18 @@ function setStatus(live,text){document.getElementById('dot').className='tdot'+(l
 function setProgress(pct,text){document.getElementById('progText').textContent=text;document.getElementById('progFill').style.width=pct+'%';}
 
 async function fetchJSON(url){
-  try{
-    var res=await fetch(PROXY+encodeURIComponent(url));
-    if(!res.ok)return null;
-    return await res.json();
-  }catch(e){return null;}
+  try{var res=await fetch(PROXY+encodeURIComponent(url));if(!res.ok)return null;return await res.json();}catch(e){return null;}
+}
+
+function cleanTitle(t){return(t||'').trim().replace(/^(yes|no)\s+/i,'').trim();}
+
+function getKalshiTitles(km){
+  var raw=(km.title||'').trim(),titles=[];
+  if(raw.indexOf(',')>-1){raw.split(',').forEach(function(t){var c=cleanTitle(t);if(c.length>1)titles.push(c);});}
+  else{var c=cleanTitle(raw);if(c.length>1)titles.push(c);}
+  var sub=cleanTitle(km.yes_sub_title||'');
+  if(sub.length>1&&titles.indexOf(sub)<0)titles.push(sub);
+  return titles;
 }
 
 function words(s){
@@ -118,6 +125,7 @@ function words(s){
     .replace(/\bbtc\b/g,'bitcoin').replace(/\beth\b/g,'ethereum')
     .replace(/\bsol\b/g,'solana').replace(/\bxrp\b/g,'ripple')
     .replace(/\bgop\b/g,'republican').replace(/\bpotus\b/g,'president')
+    .replace(/\bfed\b/g,'federal').replace(/\buk\b/g,'kingdom')
     .replace(/[^a-z0-9]/g,' ').split(' ')
     .filter(function(w){return w.length>2;});
 }
@@ -125,23 +133,15 @@ function words(s){
 function similarity(a,b){
   var wa=words(a),wb=new Set(words(b));
   if(!wa.length||!wb.size)return 0;
-  var shared=0;
-  wa.forEach(function(w){if(wb.has(w))shared++;});
+  var shared=0;wa.forEach(function(w){if(wb.has(w))shared++;});
   return shared/Math.min(wa.length,wb.size);
 }
 
-function getKalshiTitles(km){
-  var raw=(km.title||'').trim();
-  var titles=raw.indexOf(',')>-1?raw.split(',').map(function(t){return t.trim();}):raw?[raw]:[];
-  var sub=(km.yes_sub_title||'').trim();
-  if(sub&&titles.indexOf(sub)<0)titles.push(sub);
-  return titles.filter(function(t){return t.length>2;});
-}
-
 async function fetchKalshi(){
-  var all=[],cursor='';
-  for(var page=0;page<10;page++){
-    var url='https://external-api.kalshi.com/trade-api/v2/markets?status=open&limit=200'+(cursor?'&cursor='+cursor:'');
+  var all=[],cursor=null;
+  for(var page=0;page<12;page++){
+    var url='https://external-api.kalshi.com/trade-api/v2/markets?status=open&limit=200';
+    if(cursor)url+='&cursor='+encodeURIComponent(cursor);
     setProgress(5+page*2,'Fetching Kalshi... '+all.length+' markets');
     var data=await fetchJSON(url);
     if(!data||!data.markets||!data.markets.length)break;
@@ -156,17 +156,16 @@ async function fetchPolymarket(){
   var all=[],offset=0;
   for(var page=0;page<10;page++){
     var url='https://gamma-api.polymarket.com/markets?closed=false&active=true&limit=100&offset='+offset+'&order=volume&ascending=false';
-    setProgress(30+page*2,'Fetching Polymarket... '+all.length+' markets');
+    setProgress(35+page*2,'Fetching Polymarket... '+all.length+' markets');
     var data=await fetchJSON(url);
     if(!data||!Array.isArray(data)||!data.length)break;
-    all=all.concat(data);
-    offset+=100;
+    all=all.concat(data);offset+=100;
     if(data.length<100)break;
   }
   return all.filter(function(m){return m.active&&!m.closed&&m.outcomePrices&&m.outcomes;});
 }
 
-function catBadge(t){t=(t||'').toLowerCase();if(/nba|nfl|mlb|nhl|wnba|soccer|tennis|golf|ufc|mma|epl|world cup|champion|playoff|super bowl/.test(t))return'<span class="catbadge cat-sports">🏆 Sports</span>';if(/bitcoin|btc|eth|crypto|coin|token|blockchain|sol|xrp/.test(t))return'<span class="catbadge cat-crypto">₿ Crypto</span>';if(/elect|president|senate|congress|governor|vote|democrat|republican|trump|harris/.test(t))return'<span class="catbadge cat-politics">🗳️ Politics</span>';if(/fed|rate|inflation|gdp|unemploy|cpi|economic|stock|dow|nasdaq/.test(t))return'<span class="catbadge cat-economics">📈 Economics</span>';return'<span class="catbadge cat-other">🌐 Other</span>';}
+function catBadge(t){t=(t||'').toLowerCase();if(/nba|nfl|mlb|nhl|wnba|soccer|tennis|golf|ufc|mma|epl|world cup|champion|playoff|super bowl|fifa/.test(t))return'<span class="catbadge cat-sports">🏆 Sports</span>';if(/bitcoin|btc|eth|crypto|coin|token|blockchain|sol|xrp/.test(t))return'<span class="catbadge cat-crypto">₿ Crypto</span>';if(/elect|president|senate|congress|governor|vote|democrat|republican|trump|harris/.test(t))return'<span class="catbadge cat-politics">🗳️ Politics</span>';if(/fed|rate|inflation|gdp|unemploy|cpi|economic|stock|dow|nasdaq|federal/.test(t))return'<span class="catbadge cat-economics">📈 Economics</span>';return'<span class="catbadge cat-other">🌐 Other</span>';}
 
 function buildIndex(markets){var idx={};markets.forEach(function(m,i){words(m.question||m.title||'').forEach(function(w){if(!idx[w])idx[w]=[];idx[w].push(i);});});return idx;}
 
@@ -174,17 +173,14 @@ function bestMatch(title,markets,idx,thresh){
   var hits={};
   words(title).forEach(function(w){if(idx[w])idx[w].forEach(function(i){hits[i]=(hits[i]||0)+1;});});
   var best=null,bestS=0;
-  Object.keys(hits).forEach(function(i){
-    var s=similarity(title,markets[i].question||markets[i].title||'');
-    if(s>bestS&&s>=thresh){bestS=s;best=markets[i];}
-  });
+  Object.keys(hits).forEach(function(i){var s=similarity(title,markets[i].question||markets[i].title||'');if(s>bestS&&s>=thresh){bestS=s;best=markets[i];}});
   return{match:best,sim:bestS};
 }
 
 async function startScan(){
   var bank=parseFloat(document.getElementById('bank').value)||1000;
   var minEdge=parseFloat(document.getElementById('mine').value)||0.1;
-  var thresh=parseFloat(document.getElementById('simThresh').value)||0.08;
+  var thresh=parseFloat(document.getElementById('simThresh').value)||0.25;
   scanCount++;setStatus(true,'scanning...');
   document.getElementById('prog').style.display='block';
   setProgress(0,'Starting...');
@@ -195,23 +191,17 @@ async function startScan(){
     setProgress(65,'Building index...');
     var idx=buildIndex(poly);
     setProgress(70,'Scanning for arbs...');
-    var arbs=[],matched=0;
+    var arbs=[],matched=0,priceFail=0;
     kalshi.forEach(function(km){
-      var kYes=parseFloat(km.yes_bid_dollars||0);
-      var kNo=parseFloat(km.no_bid_dollars||0);
+      var kYes=parseFloat(km.yes_bid_dollars||0),kNo=parseFloat(km.no_bid_dollars||0);
       if(!kYes&&km.yes_bid)kYes=parseFloat(km.yes_bid)/100;
       if(!kNo&&km.no_bid)kNo=parseFloat(km.no_bid)/100;
-      if(!kYes||!kNo||isNaN(kYes)||isNaN(kNo)||kYes<=0.01||kYes>=0.99)return;
-      var titles=getKalshiTitles(km);
-      var bestR=null;
-      titles.forEach(function(t){
-        var r=bestMatch(t,poly,idx,thresh);
-        if(r.match&&(!bestR||r.sim>bestR.sim)){bestR=r;bestR.usedTitle=t;}
-      });
+      if(!kYes||!kNo||isNaN(kYes)||isNaN(kNo)||kYes<=0.01||kYes>=0.99){priceFail++;return;}
+      var titles=getKalshiTitles(km),bestR=null;
+      titles.forEach(function(t){var r=bestMatch(t,poly,idx,thresh);if(r.match&&(!bestR||r.sim>bestR.sim)){bestR=r;bestR.usedTitle=t;}});
       if(!bestR||!bestR.match)return;
       matched++;
-      var kTitle=bestR.usedTitle;
-      var pm=bestR.match;
+      var kTitle=bestR.usedTitle,pm=bestR.match;
       var pPrices=[];try{pPrices=JSON.parse(pm.outcomePrices||'[]');}catch(e){}
       var pOut=[];try{pOut=JSON.parse(pm.outcomes||'[]');}catch(e){}
       if(pOut.length<2||pPrices.length<2)return;
@@ -240,7 +230,7 @@ async function startScan(){
         var sp=Math.round(x.sim*100);
         var cd=x.closeTime?new Date(x.closeTime).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
         h+='<div class="card'+(x.edge>2?' hot':'')+'"><div class="ctop"><div style="flex:1;min-width:0">';
-        h+=x.badge;if(sp<50)h+='<span class="sim-badge">⚠️ '+sp+'% match</span>';
+        h+=x.badge;if(sp<60)h+='<span class="sim-badge">⚠️ '+sp+'% match</span>';
         h+='<div class="gtitle">K: '+x.kTitle+'</div>';
         h+='<div class="gtitle" style="color:#666;font-size:11px;margin-top:2px">P: '+x.pTitle+'</div>';
         if(cd)h+='<div class="close-time">⏱ Closes '+cd+'</div>';
@@ -257,7 +247,7 @@ async function startScan(){
         h+='</div></div></div>';
       });
     }else{
-      h+='<div class="msg">No arbs found above '+minEdge+'%.<br><br>'+matched+' markets matched.</div>';
+      h+='<div class="msg">No arbs found above '+minEdge+'%.<br><br>'+matched+' markets matched between platforms.</div>';
     }
     document.getElementById('out').innerHTML=h;
     setStatus(false,'Scan #'+scanCount+' · '+arbs.length+' arbs · '+now);
