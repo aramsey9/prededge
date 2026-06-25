@@ -6,147 +6,266 @@
 <title>PredEdge</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
-body{background:#0a0a0f;color:#e8e8f0;font-family:sans-serif;padding:16px 16px 40px}
+body{background:#0a0a0f;color:#e8e8f0;font-family:sans-serif;padding:16px 16px 80px}
 h1{color:#00c896;font-size:22px;margin-bottom:4px}
-.sub{color:#666;font-size:12px;margin-bottom:12px}
-button{background:#00c896;color:#000;border:none;border-radius:8px;padding:14px;font-size:15px;font-weight:bold;cursor:pointer;width:100%;margin-bottom:12px}
-.prog{background:#1a1a26;border-radius:8px;padding:12px;margin-bottom:12px;font-size:12px;color:#666}
-.prog-bar{height:4px;background:#2a2a3d;border-radius:2px;margin-top:6px}
+.sub{color:#666;font-size:12px;margin-bottom:16px}
+.row{display:flex;gap:8px;margin-bottom:10px}
+input{background:#1a1a26;border:1px solid #2a2a3d;color:#e8e8f0;border-radius:8px;padding:12px;font-size:14px;width:100%;margin-bottom:10px;font-family:monospace}
+.row input{margin-bottom:0}
+button.scan{background:#00c896;color:#000;border:none;border-radius:8px;padding:14px;font-size:15px;font-weight:bold;cursor:pointer;width:100%;margin-bottom:12px}
+.cats{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:8px}
+.cb{background:#1a1a26;color:#eee;border:1px solid #2a2a3d;border-radius:8px;padding:8px 12px;font-size:12px;cursor:pointer;user-select:none;-webkit-user-select:none}
+.cb.on{background:#00c896;color:#000;border-color:#00c896}
+.slabel{color:#666;font-size:11px;text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px;margin-top:10px}
+.stats{color:#666;font-size:12px;margin-bottom:12px}
+.card{background:#12121a;border:1px solid #2a2a3d;border-radius:12px;margin-bottom:12px;overflow:hidden}
+.card.hot{border-color:#00c896;box-shadow:0 0 16px rgba(0,200,150,.12)}
+.ctop{padding:12px 14px;display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+.gtitle{font-size:13px;font-weight:600;line-height:1.4;margin-bottom:4px}
+.roi{color:#00c896;font-size:20px;font-weight:bold;white-space:nowrap}
+.psub{color:#666;font-size:11px;text-align:right}
+.sides{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:#2a2a3d;border-top:1px solid #2a2a3d}
+.side{background:#1a1a26;padding:10px 12px}
+.platform{font-size:10px;font-weight:bold;text-transform:uppercase;margin-bottom:2px}
+.kalshi-color{color:#00c896}
+.poly-color{color:#0087ff}
+.team{color:#e8e8f0;font-size:12px;margin-bottom:3px;line-height:1.3}
+.price{font-size:15px;font-weight:bold;font-family:monospace}
+.stake{color:#00c896;font-size:11px;font-family:monospace;margin-top:2px}
+.open-link{display:block;margin-top:6px;font-size:11px;font-weight:700;text-decoration:none}
+.kalshi-link{color:#00c896}
+.poly-link{color:#0087ff}
+.msg{color:#666;text-align:center;padding:40px 16px;background:#12121a;border-radius:12px;line-height:1.8}
+.err{color:#ff4757;background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px}
+.warn{color:#f59e0b;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px}
+.alert-bar{background:rgba(0,200,150,.1);border:1px solid rgba(0,200,150,.3);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#00c896}
+.ticker{position:fixed;bottom:0;left:0;right:0;background:#12121a;border-top:1px solid #2a2a3d;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px}
+.ticker-info{font-size:12px;color:#666;font-family:monospace;flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.tdot{width:8px;height:8px;border-radius:50%;background:#666;display:inline-block;margin-right:6px;flex-shrink:0}
+.tdot.live{background:#00c896;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.4}}
+.tbtn{border:none;border-radius:8px;padding:8px 14px;font-size:12px;font-weight:bold;cursor:pointer}
+.prog{background:#1a1a26;border-radius:8px;padding:12px 14px;margin-bottom:12px;font-size:12px;color:#666;font-family:monospace}
+.prog-bar{height:4px;background:#2a2a3d;border-radius:2px;margin-top:8px;overflow:hidden}
 .prog-fill{height:100%;background:#00c896;border-radius:2px;transition:width .3s}
-.box{background:#12121a;border:1px solid #2a2a3d;border-radius:8px;padding:12px;margin-bottom:10px;font-size:11px;font-family:monospace;color:#aaa;word-break:break-all;line-height:1.8}
-.box h3{color:#00c896;font-size:12px;margin-bottom:6px;font-family:sans-serif;font-weight:bold}
-.hi{color:#f59e0b}
-.gr{color:#00c896}
+.catbadge{display:inline-block;font-size:9px;font-weight:bold;text-transform:uppercase;letter-spacing:.6px;padding:2px 6px;border-radius:4px;margin-bottom:4px;margin-right:4px}
+.cat-sports{background:rgba(0,200,150,.15);color:#00c896}
+.cat-politics{background:rgba(124,58,237,.2);color:#a78bfa}
+.cat-crypto{background:rgba(255,165,0,.15);color:#ffa500}
+.cat-economics{background:rgba(59,130,246,.2);color:#60a5fa}
+.cat-other{background:rgba(156,163,175,.15);color:#9ca3af}
+.sim-badge{background:rgba(255,71,87,.15);color:#ff6b6b;font-size:9px;font-weight:bold;text-transform:uppercase;padding:2px 6px;border-radius:4px;margin-left:6px}
+.close-time{color:#f59e0b;font-size:10px;font-family:monospace;margin-top:2px}
+.vol{color:#666;font-size:10px;margin-top:2px}
+.info-box{background:#12121a;border:1px solid #2a2a3d;border-radius:12px;padding:14px;margin-bottom:16px;font-size:12px;color:#888;line-height:1.8}
+.info-box strong{color:#e8e8f0}
 </style>
 </head>
 <body>
-<h1>PredEdge Debug</h1>
-<div class="sub">Shows raw API data to fix matching</div>
-<button onclick="go()">🔍 Run Debug</button>
+<h1>PredEdge</h1>
+<div class="sub">Kalshi × Polymarket · Cross-Platform Arb Scanner</div>
+<div class="info-box">
+  <strong>How it works:</strong> Scans Kalshi and Polymarket for the same event priced differently. If YES on one platform + NO on the other costs less than $1.00, that's a guaranteed profit regardless of outcome.<br>
+  <strong>Note:</strong> Polymarket requires USDC (crypto). Kalshi uses USD directly.
+</div>
+<div class="row">
+  <input type="number" id="bank" value="1000" placeholder="Bankroll $" />
+  <input type="number" id="mine" value="0.1" placeholder="Min %" step="0.1" />
+</div>
+<div class="slabel">Categories</div>
+<div class="cats" id="cats">
+  <div class="cb on" data-c="sports">🏆 Sports</div>
+  <div class="cb on" data-c="politics">🗳️ Politics</div>
+  <div class="cb on" data-c="crypto">₿ Crypto</div>
+  <div class="cb on" data-c="economics">📈 Economics</div>
+  <div class="cb on" data-c="other">🌐 Other</div>
+</div>
+<div class="slabel">Similarity threshold</div>
+<div class="row" style="margin-bottom:14px">
+  <input type="number" id="simThresh" value="0.08" step="0.01" min="0.01" max="1" placeholder="0.08" style="margin-bottom:0" />
+  <span style="color:#666;font-size:12px;padding:12px 0 0 4px">match score (lower = more results)</span>
+</div>
+<button class="scan" onclick="startScan()">🔍 Scan Arbs</button>
 <div id="prog" style="display:none" class="prog">
-  <span id="pt">Loading...</span>
-  <div class="prog-bar"><div class="prog-fill" id="pf" style="width:0%"></div></div>
+  <span id="progText">Fetching markets...</span>
+  <div class="prog-bar"><div class="prog-fill" id="progFill" style="width:0%"></div></div>
 </div>
 <div id="out"></div>
+<div class="ticker">
+  <div class="ticker-info"><span class="tdot" id="dot"></span><span id="ttext">idle</span></div>
+  <div style="display:flex;gap:8px;flex-shrink:0">
+    <button class="tbtn" onclick="document.getElementById('out').innerHTML=''" style="background:#1a1a26;color:#ff4757;border:1px solid #ff4757">Clear</button>
+  </div>
+</div>
 <script>
-function sp(p,t){document.getElementById('pt').textContent=t;document.getElementById('pf').style.width=p+'%';}
-function esc(s){return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');}
+var PROXY='https://prededge-proxy.andrewramsey14.workers.dev/?url=';
+var scanCount=0;
+document.getElementById('cats').addEventListener('click',function(e){var b=e.target.closest('[data-c]');if(b)b.classList.toggle('on');});
+function getCategories(){return Array.from(document.querySelectorAll('#cats [data-c].on')).map(function(b){return b.dataset.c;});}
+function setStatus(live,text){document.getElementById('dot').className='tdot'+(live?' live':'');document.getElementById('ttext').textContent=text;}
+function setProgress(pct,text){document.getElementById('progText').textContent=text;document.getElementById('progFill').style.width=pct+'%';}
 
-async function tryFetch(url){
-  var attempts=[
-    ['corsproxy','https://corsproxy.io/?'+encodeURIComponent(url),false],
-    ['allorigins-get','https://api.allorigins.win/get?url='+encodeURIComponent(url),true],
-    ['allorigins-raw','https://api.allorigins.win/raw?url='+encodeURIComponent(url),false],
-    ['direct',url,false]
-  ];
-  for(var i=0;i<attempts.length;i++){
-    var name=attempts[i][0],u=attempts[i][1],isGet=attempts[i][2];
-    try{
-      var c=new AbortController();
-      setTimeout(function(){c.abort();},15000);
-      var r=await fetch(u,{signal:c.signal});
-      if(!r.ok)continue;
-      var t=await r.text();
-      if(!t||t.length<5)continue;
-      if(isGet){var w=JSON.parse(t);return{data:JSON.parse(w.contents),via:name};}
-      return{data:JSON.parse(t),via:name};
-    }catch(e){}
+async function fetchJSON(url){
+  try{
+    var res=await fetch(PROXY+encodeURIComponent(url));
+    if(!res.ok)return null;
+    return await res.json();
+  }catch(e){return null;}
+}
+
+function words(s){
+  return(s||'').toLowerCase()
+    .replace(/\bbtc\b/g,'bitcoin').replace(/\beth\b/g,'ethereum')
+    .replace(/\bsol\b/g,'solana').replace(/\bxrp\b/g,'ripple')
+    .replace(/\bgop\b/g,'republican').replace(/\bpotus\b/g,'president')
+    .replace(/[^a-z0-9]/g,' ').split(' ')
+    .filter(function(w){return w.length>2;});
+}
+
+function similarity(a,b){
+  var wa=words(a),wb=new Set(words(b));
+  if(!wa.length||!wb.size)return 0;
+  var shared=0;
+  wa.forEach(function(w){if(wb.has(w))shared++;});
+  return shared/Math.min(wa.length,wb.size);
+}
+
+function getKalshiTitles(km){
+  var raw=(km.title||'').trim();
+  var titles=raw.indexOf(',')>-1?raw.split(',').map(function(t){return t.trim();}):raw?[raw]:[];
+  var sub=(km.yes_sub_title||'').trim();
+  if(sub&&titles.indexOf(sub)<0)titles.push(sub);
+  return titles.filter(function(t){return t.length>2;});
+}
+
+async function fetchKalshi(){
+  var all=[],cursor='';
+  for(var page=0;page<10;page++){
+    var url='https://external-api.kalshi.com/trade-api/v2/markets?status=open&limit=200'+(cursor?'&cursor='+cursor:'');
+    setProgress(5+page*2,'Fetching Kalshi... '+all.length+' markets');
+    var data=await fetchJSON(url);
+    if(!data||!data.markets||!data.markets.length)break;
+    all=all.concat(data.markets);
+    if(!data.cursor||data.markets.length<200)break;
+    cursor=data.cursor;
   }
-  return null;
+  return all.filter(function(m){return m.status==='active';});
 }
 
-function getWords(s){
-  return(s||'').toLowerCase().replace(/[^a-z0-9]/g,' ').split(' ').filter(function(w){return w.length>2;});
+async function fetchPolymarket(){
+  var all=[],offset=0;
+  for(var page=0;page<10;page++){
+    var url='https://gamma-api.polymarket.com/markets?closed=false&active=true&limit=100&offset='+offset+'&order=volume&ascending=false';
+    setProgress(30+page*2,'Fetching Polymarket... '+all.length+' markets');
+    var data=await fetchJSON(url);
+    if(!data||!Array.isArray(data)||!data.length)break;
+    all=all.concat(data);
+    offset+=100;
+    if(data.length<100)break;
+  }
+  return all.filter(function(m){return m.active&&!m.closed&&m.outcomePrices&&m.outcomes;});
 }
 
-function shared(a,b){
-  var wb=new Set(getWords(b));
-  return getWords(a).filter(function(w){return wb.has(w);});
+function catBadge(t){t=(t||'').toLowerCase();if(/nba|nfl|mlb|nhl|wnba|soccer|tennis|golf|ufc|mma|epl|world cup|champion|playoff|super bowl/.test(t))return'<span class="catbadge cat-sports">🏆 Sports</span>';if(/bitcoin|btc|eth|crypto|coin|token|blockchain|sol|xrp/.test(t))return'<span class="catbadge cat-crypto">₿ Crypto</span>';if(/elect|president|senate|congress|governor|vote|democrat|republican|trump|harris/.test(t))return'<span class="catbadge cat-politics">🗳️ Politics</span>';if(/fed|rate|inflation|gdp|unemploy|cpi|economic|stock|dow|nasdaq/.test(t))return'<span class="catbadge cat-economics">📈 Economics</span>';return'<span class="catbadge cat-other">🌐 Other</span>';}
+
+function buildIndex(markets){var idx={};markets.forEach(function(m,i){words(m.question||m.title||'').forEach(function(w){if(!idx[w])idx[w]=[];idx[w].push(i);});});return idx;}
+
+function bestMatch(title,markets,idx,thresh){
+  var hits={};
+  words(title).forEach(function(w){if(idx[w])idx[w].forEach(function(i){hits[i]=(hits[i]||0)+1;});});
+  var best=null,bestS=0;
+  Object.keys(hits).forEach(function(i){
+    var s=similarity(title,markets[i].question||markets[i].title||'');
+    if(s>bestS&&s>=thresh){bestS=s;best=markets[i];}
+  });
+  return{match:best,sim:bestS};
 }
 
-async function go(){
+async function startScan(){
+  var bank=parseFloat(document.getElementById('bank').value)||1000;
+  var minEdge=parseFloat(document.getElementById('mine').value)||0.1;
+  var thresh=parseFloat(document.getElementById('simThresh').value)||0.08;
+  scanCount++;setStatus(true,'scanning...');
   document.getElementById('prog').style.display='block';
+  setProgress(0,'Starting...');
   document.getElementById('out').innerHTML='';
-  var h='';
-
-  sp(10,'Fetching Kalshi page 1...');
-  var kr=await tryFetch('https://external-api.kalshi.com/trade-api/v2/markets?status=open&limit=10');
-
-  sp(40,'Fetching Kalshi page 2 (cursor)...');
-  var kr2=null;
-  if(kr&&kr.data&&kr.data.cursor){
-    kr2=await tryFetch('https://external-api.kalshi.com/trade-api/v2/markets?status=open&limit=10&cursor='+kr.data.cursor);
-  }
-
-  sp(60,'Fetching Polymarket...');
-  var pr=await tryFetch('https://gamma-api.polymarket.com/markets?closed=false&active=true&limit=10&order=volume&ascending=false');
-
-  sp(90,'Analyzing...');
-
-  // Show Kalshi page 1 results
-  if(kr&&kr.data&&kr.data.markets){
-    var ms=kr.data.markets;
-    h+='<div class="box"><h3>✅ KALSHI page 1 loaded via '+esc(kr.via)+' ('+ms.length+' markets)</h3>';
-    h+='cursor: <span class="hi">'+esc(kr.data.cursor)+'</span><br><br>';
-    h+='<b>First market all fields:</b><br>';
-    var m=ms[0];
-    Object.keys(m).forEach(function(k){
-      var v=JSON.stringify(m[k]);
-      if(v&&v!='null'&&v!='""'&&v!='0'&&v!='false')
-        h+='<span class="hi">'+esc(k)+'</span>: <span class="gr">'+esc(v.slice(0,60))+'</span><br>';
-    });
-    h+='<br><b>All titles (title field):</b><br>';
-    ms.forEach(function(m,i){h+=i+'. <span class="gr">'+esc(m.title)+'</span><br>';});
-    h+='</div>';
-  } else {
-    h+='<div class="box" style="color:#ff4757">❌ KALSHI FAILED</div>';
-  }
-
-  // Show Kalshi page 2 (tests cursor pagination)
-  if(kr2&&kr2.data&&kr2.data.markets){
-    h+='<div class="box"><h3>✅ KALSHI page 2 via cursor ('+kr2.data.markets.length+' markets)</h3>';
-    h+='Pagination works! Sample: <span class="gr">'+esc(kr2.data.markets[0]&&kr2.data.markets[0].title)+'</span>';
-    h+='</div>';
-  } else {
-    h+='<div class="box" style="color:#f59e0b">⚠️ KALSHI page 2 failed or no cursor</div>';
-  }
-
-  // Show Polymarket results
-  if(pr&&pr.data&&Array.isArray(pr.data)){
-    var ps=pr.data;
-    h+='<div class="box"><h3>✅ POLYMARKET loaded via '+esc(pr.via)+' ('+ps.length+' markets)</h3>';
-    h+='<b>Top 5 questions:</b><br>';
-    ps.slice(0,5).forEach(function(m,i){h+=i+'. <span class="gr">'+esc(m.question)+'</span><br>';});
-    h+='</div>';
-  } else {
-    h+='<div class="box" style="color:#ff4757">❌ POLYMARKET FAILED</div>';
-  }
-
-  // Try matching
-  if(kr&&kr.data&&kr.data.markets&&pr&&pr.data&&Array.isArray(pr.data)){
-    h+='<div class="box"><h3>🔍 MATCH TEST — Kalshi vs Polymarket</h3>';
-    var km=kr.data.markets;
-    var pm=pr.data;
-    km.slice(0,5).forEach(function(k){
-      var titles=k.title?k.title.split(','):[k.yes_sub_title||''];
-      titles.forEach(function(kt){
-        kt=kt.trim();
-        var bestShared=[],bestPM='',bestScore=0;
-        pm.forEach(function(p){
-          var s=shared(kt,p.question||'');
-          if(s.length>bestScore){bestScore=s.length;bestShared=s;bestPM=p.question||'';}
-        });
-        h+='K: <span class="hi">'+esc(kt)+'</span><br>';
-        h+='Best P: <span class="gr">'+esc(bestPM.slice(0,70))+'</span><br>';
-        h+='Shared: <span style="color:#a78bfa">'+esc(bestShared.join(', '))+'</span><br><br>';
+  try{
+    var kalshi=await fetchKalshi();
+    var poly=await fetchPolymarket();
+    setProgress(65,'Building index...');
+    var idx=buildIndex(poly);
+    setProgress(70,'Scanning for arbs...');
+    var arbs=[],matched=0;
+    kalshi.forEach(function(km){
+      var kYes=parseFloat(km.yes_bid_dollars||0);
+      var kNo=parseFloat(km.no_bid_dollars||0);
+      if(!kYes&&km.yes_bid)kYes=parseFloat(km.yes_bid)/100;
+      if(!kNo&&km.no_bid)kNo=parseFloat(km.no_bid)/100;
+      if(!kYes||!kNo||isNaN(kYes)||isNaN(kNo)||kYes<=0.01||kYes>=0.99)return;
+      var titles=getKalshiTitles(km);
+      var bestR=null;
+      titles.forEach(function(t){
+        var r=bestMatch(t,poly,idx,thresh);
+        if(r.match&&(!bestR||r.sim>bestR.sim)){bestR=r;bestR.usedTitle=t;}
+      });
+      if(!bestR||!bestR.match)return;
+      matched++;
+      var kTitle=bestR.usedTitle;
+      var pm=bestR.match;
+      var pPrices=[];try{pPrices=JSON.parse(pm.outcomePrices||'[]');}catch(e){}
+      var pOut=[];try{pOut=JSON.parse(pm.outcomes||'[]');}catch(e){}
+      if(pOut.length<2||pPrices.length<2)return;
+      var pYes=parseFloat(pPrices[0]||0),pNo=parseFloat(pPrices[1]||0);
+      if(!pYes||!pNo)return;
+      var badge=catBadge(kTitle+' '+(pm.question||''));
+      [[kYes,pNo,'YES','NO'],[kNo,pYes,'NO','YES']].forEach(function(c){
+        var kP=c[0],pP=c[1],kS=c[2],pS=c[3],tot=kP+pP,edge=(1-tot)*100;
+        if(edge>=minEdge&&tot<1.0){
+          var profit=(bank/tot)-bank;
+          arbs.push({kTitle:kTitle,pTitle:pm.question||pm.title||'',sim:bestR.sim,edge:edge,roi:(profit/bank)*100,profit:profit,closeTime:km.close_time||pm.endDate,kSide:kS,kPrice:kP,kStake:bank*(kP/tot),pSide:pS,pPrice:pP,pStake:bank*(pP/tot),ticker:km.ticker,slug:pm.slug||pm.id,vol:pm.volume,badge:badge});
+        }
       });
     });
-    h+='</div>';
+    arbs.sort(function(a,b){return b.edge-a.edge;});
+    setProgress(100,'Done');
+    document.getElementById('prog').style.display='none';
+    var now=new Date().toLocaleTimeString();
+    var warns='';
+    if(kalshi.length===0)warns+='<div class="warn">⚠️ Kalshi: 0 markets loaded.</div>';
+    if(poly.length<200)warns+='<div class="warn">⚠️ Polymarket: only '+poly.length+' markets.</div>';
+    var h=warns+'<div class="stats">Scan #'+scanCount+' · '+kalshi.length+' Kalshi · '+poly.length+' Poly · '+matched+' matched · '+arbs.length+' arbs · '+now+'</div>';
+    if(arbs.length){
+      h+='<div class="alert-bar">⚡ '+arbs.length+' arb'+(arbs.length>1?'s':'')+' found · '+now+'</div>';
+      arbs.forEach(function(x){
+        var sp=Math.round(x.sim*100);
+        var cd=x.closeTime?new Date(x.closeTime).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
+        h+='<div class="card'+(x.edge>2?' hot':'')+'"><div class="ctop"><div style="flex:1;min-width:0">';
+        h+=x.badge;if(sp<50)h+='<span class="sim-badge">⚠️ '+sp+'% match</span>';
+        h+='<div class="gtitle">K: '+x.kTitle+'</div>';
+        h+='<div class="gtitle" style="color:#666;font-size:11px;margin-top:2px">P: '+x.pTitle+'</div>';
+        if(cd)h+='<div class="close-time">⏱ Closes '+cd+'</div>';
+        if(x.vol)h+='<div class="vol">Poly vol $'+Number(x.vol).toLocaleString(undefined,{maximumFractionDigits:0})+'</div>';
+        h+='</div><div style="text-align:right;flex-shrink:0"><div class="roi">+'+x.roi.toFixed(2)+'%</div>';
+        h+='<div class="psub">$'+x.profit.toFixed(2)+' profit</div><div class="psub">'+sp+'% match</div>';
+        h+='</div></div><div class="sides">';
+        h+='<div class="side"><div class="platform kalshi-color">Kalshi</div><div class="team">'+x.kSide+'</div>';
+        h+='<div class="price kalshi-color">'+(x.kPrice*100).toFixed(0)+'¢</div><div class="stake">Bet $'+x.kStake.toFixed(2)+'</div>';
+        h+='<a href="https://kalshi.com/markets/'+x.ticker.toLowerCase()+'" target="_blank" class="open-link kalshi-link">Open Kalshi →</a></div>';
+        h+='<div class="side"><div class="platform poly-color">Polymarket</div><div class="team">'+x.pSide+'</div>';
+        h+='<div class="price poly-color">'+(x.pPrice*100).toFixed(0)+'¢</div><div class="stake">Bet $'+x.pStake.toFixed(2)+'</div>';
+        if(x.slug)h+='<a href="https://polymarket.com/event/'+x.slug+'" target="_blank" class="open-link poly-link">Open Poly →</a>';
+        h+='</div></div></div>';
+      });
+    }else{
+      h+='<div class="msg">No arbs found above '+minEdge+'%.<br><br>'+matched+' markets matched.</div>';
+    }
+    document.getElementById('out').innerHTML=h;
+    setStatus(false,'Scan #'+scanCount+' · '+arbs.length+' arbs · '+now);
+  }catch(e){
+    document.getElementById('prog').style.display='none';
+    document.getElementById('out').innerHTML='<div class="err">Error: '+e.message+'</div>';
+    setStatus(false,'error');
   }
-
-  sp(100,'Done');
-  document.getElementById('prog').style.display='none';
-  document.getElementById('out').innerHTML=h;
 }
 </script>
 </body>
