@@ -138,30 +138,30 @@ function similarity(a,b){
 
 function getPrice(m,side){
   if(side==='yes'){
-    var p=parseFloat(m.yes_bid_dollars||m.yes_ask_dollars||0);
-    if(p>0)return p;
-    return parseFloat(m.last_price_dollars||0);
-  }else{
-    var p=parseFloat(m.no_bid_dollars||m.no_ask_dollars||0);
-    if(p>0)return p;
+    var fields=['yes_bid_dollars','yes_ask_dollars','last_price_dollars'];
+    for(var i=0;i<fields.length;i++){
+      var v=parseFloat(m[fields[i]]||0);
+      if(v>0.01&&v<0.99)return v;
+    }
+  } else {
+    var fields=['no_bid_dollars','no_ask_dollars'];
+    for(var i=0;i<fields.length;i++){
+      var v=parseFloat(m[fields[i]]||0);
+      if(v>0.01&&v<0.99)return v;
+    }
     var lp=parseFloat(m.last_price_dollars||0);
-    return lp>0?1-lp:0;
+    if(lp>0.01&&lp<0.99)return 1-lp;
   }
+  return 0;
 }
 
-// Single request to worker which paginates Kalshi server-side
 async function fetchKalshi(){
   setProgress(5,'Fetching all Kalshi markets...');
   var data=await fetchJSON('KALSHI_ALL');
-  if(!data||!data.markets){
-    return [];
-  }
-  setProgress(28,'Got '+data.total+' Kalshi markets');
-  return data.markets.filter(function(m){
-    if(m.status!=='active')return false;
-    var yes=getPrice(m,'yes'),no=getPrice(m,'no');
-    return yes>0.01&&yes<0.99&&no>0.01&&no<0.99;
-  });
+  if(!data||!data.markets)return [];
+  setProgress(28,'Got '+data.markets.length+' Kalshi markets');
+  // Only filter by status - let price check happen during arb scan
+  return data.markets.filter(function(m){return m.status==='active';});
 }
 
 async function fetchPolymarket(){
@@ -229,7 +229,7 @@ async function startScan(){
     document.getElementById('prog').style.display='none';
     var now=new Date().toLocaleTimeString();
     var warns='';
-    if(kalshi.length===0)warns+='<div class="warn">⚠️ Kalshi: 0 markets with prices.</div>';
+    if(kalshi.length===0)warns+='<div class="warn">⚠️ Kalshi: 0 markets loaded.</div>';
     if(poly.length<200)warns+='<div class="warn">⚠️ Polymarket: only '+poly.length+' markets.</div>';
     var h=warns+'<div class="stats">Scan #'+scanCount+' · '+kalshi.length+' Kalshi · '+poly.length+' Poly · '+matched+' matched · '+arbs.length+' arbs · '+now+'</div>';
     if(arbs.length){
