@@ -39,7 +39,6 @@ button.scan{background:#00c896;color:#000;border:none;border-radius:8px;padding:
 .err{color:#ff4757;background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px}
 .warn{color:#f59e0b;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px}
 .alert-bar{background:rgba(0,200,150,.1);border:1px solid rgba(0,200,150,.3);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#00c896}
-.debug{background:#0d1117;border:1px solid #2a2a3d;border-radius:8px;padding:10px;margin-bottom:12px;font-size:10px;color:#666;font-family:monospace;word-break:break-all;max-height:200px;overflow-y:auto}
 .ticker{position:fixed;bottom:0;left:0;right:0;background:#12121a;border-top:1px solid #2a2a3d;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px}
 .ticker-info{font-size:12px;color:#666;font-family:monospace;flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .tdot{width:8px;height:8px;border-radius:50%;background:#666;display:inline-block;margin-right:6px;flex-shrink:0}
@@ -149,27 +148,31 @@ function similarity(a,b){
   return shared/Math.min(wa.length,wb.size);
 }
 
-async function fetchKalshi(cats){
+function getKalshiTitles(km){
+  var raw=(km.title||'').trim();
+  var titles=[];
+  if(raw.indexOf(',')>-1){
+    raw.split(',').forEach(function(t){t=t.trim();if(t)titles.push(t);});
+  }else{
+    titles.push(raw);
+  }
+  var sub=(km.yes_sub_title||'').trim();
+  if(sub&&titles.indexOf(sub)<0)titles.push(sub);
+  return titles.filter(function(t){return t.length>2;});
+}
+
+async function fetchKalshi(){
   var all=[],cursor='';
-  for(var page=0;page<8;page++){
+  for(var page=0;page<10;page++){
     var url='https://external-api.kalshi.com/trade-api/v2/markets?status=open&limit=200'+(cursor?'&cursor='+cursor:'');
-    setProgress(5+page*3,'Fetching Kalshi... '+all.length+' markets');
+    setProgress(5+page*2,'Fetching Kalshi... '+all.length+' markets');
     var data=await fetchJSON(url,'K'+page);
     if(!data||!data.markets||!data.markets.length)break;
-    if(page===0&&data.markets.length>0){
-      var m=data.markets[0];
-      log('K_FIELDS:'+Object.keys(m).join(','));
-      log('K_TITLE:'+m.title);
-      log('K_YES_SUB:'+m.yes_sub_title);
-      log('K_YES_BID:'+m.yes_bid);
-      log('K_NO_BID:'+m.no_bid);
-      log('K_LAST:'+m.last_price);
-      log('K_YES_BID_$:'+m.yes_bid_dollars);
-    }
     all=all.concat(data.markets);
     if(!data.cursor||data.markets.length<200)break;
     cursor=data.cursor;
   }
+  log('Kalshi:'+all.length);
   return all.filter(function(m){return m.status==='active';});
 }
 
@@ -177,36 +180,18 @@ async function fetchPolymarket(){
   var all=[],offset=0;
   for(var page=0;page<10;page++){
     var url='https://gamma-api.polymarket.com/markets?closed=false&active=true&limit=100&offset='+offset+'&order=volume&ascending=false';
-    setProgress(35+page*2,'Fetching Polymarket... '+all.length+' markets');
+    setProgress(30+page*2,'Fetching Polymarket... '+all.length+' markets');
     var data=await fetchJSON(url,'P'+page);
     if(!data||!Array.isArray(data)||!data.length)break;
-    if(page===0&&data.length>0){
-      var pm=data[0];
-      log('P_FIELDS:'+Object.keys(pm).join(','));
-      log('P_QUESTION:'+pm.question);
-      log('P_PRICES:'+pm.outcomePrices);
-    }
     all=all.concat(data);
     offset+=100;
     if(data.length<100)break;
   }
+  log('Poly:'+all.length);
   return all.filter(function(m){return m.active&&!m.closed&&m.outcomePrices&&m.outcomes;});
 }
 
-function getPrice(m,side){
-  if(side==='yes'){
-    if(m.yes_bid_dollars!=null&&m.yes_bid_dollars>0)return parseFloat(m.yes_bid_dollars);
-    if(m.yes_bid!=null&&m.yes_bid>0)return parseFloat(m.yes_bid)/100;
-    if(m.last_price!=null&&m.last_price>0)return parseFloat(m.last_price)/100;
-  }else{
-    if(m.no_bid_dollars!=null&&m.no_bid_dollars>0)return parseFloat(m.no_bid_dollars);
-    if(m.no_bid!=null&&m.no_bid>0)return parseFloat(m.no_bid)/100;
-    if(m.last_price!=null&&m.last_price>0)return 1-(parseFloat(m.last_price)/100);
-  }
-  return 0;
-}
-
-function catBadge(t){t=(t||'').toLowerCase();if(/nba|nfl|mlb|nhl|wnba|soccer|tennis|golf|ufc|mma|epl|world cup|champion|playoff|super bowl/.test(t))return'<span class="catbadge cat-sports">🏆 Sports</span>';if(/bitcoin|btc|eth|crypto|coin|token|blockchain|sol|xrp/.test(t))return'<span class="catbadge cat-crypto">₿ Crypto</span>';if(/elect|president|senate|congress|governor|vote|democrat|republican|trump|harris/.test(t))return'<span class="catbadge cat-politics">🗳️ Politics</span>';if(/fed|rate|inflation|gdp|unemploy|cpi|economic|stock|dow|nasdaq/.test(t))return'<span class="catbadge cat-economics">📈 Economics</span>';return'<span class="catbadge cat-other">🌐 Other</span>';}
+function catBadge(t){t=(t||'').toLowerCase();if(/nba|nfl|mlb|nhl|wnba|soccer|tennis|golf|ufc|mma|epl|world cup|champion|playoff|super bowl|ivory|germany|france|brazil|england|spain|portugal|argentina/.test(t))return'<span class="catbadge cat-sports">🏆 Sports</span>';if(/bitcoin|btc|eth|crypto|coin|token|blockchain|sol|xrp/.test(t))return'<span class="catbadge cat-crypto">₿ Crypto</span>';if(/elect|president|senate|congress|governor|vote|democrat|republican|trump|harris/.test(t))return'<span class="catbadge cat-politics">🗳️ Politics</span>';if(/fed|rate|inflation|gdp|unemploy|cpi|economic|stock|dow|nasdaq/.test(t))return'<span class="catbadge cat-economics">📈 Economics</span>';return'<span class="catbadge cat-other">🌐 Other</span>';}
 
 function buildIndex(markets){var idx={};markets.forEach(function(m,i){words(m.question||m.title||'').forEach(function(w){if(!idx[w])idx[w]=[];idx[w].push(i);});});return idx;}
 
@@ -225,31 +210,34 @@ async function startScan(){
   var bank=parseFloat(document.getElementById('bank').value)||1000;
   var minEdge=parseFloat(document.getElementById('mine').value)||0.1;
   var thresh=parseFloat(document.getElementById('simThresh').value)||0.08;
-  var cats=getCategories();
   debugLog=[];
-  if(!cats.length){document.getElementById('out').innerHTML='<div class="err">Select at least one category.</div>';return;}
   scanCount++;setStatus(true,'scanning...');
   document.getElementById('prog').style.display='block';
   setProgress(0,'Starting...');
   document.getElementById('out').innerHTML='';
   try{
-    var kalshi=await fetchKalshi(cats);
+    var kalshi=await fetchKalshi();
     var poly=await fetchPolymarket();
     setProgress(65,'Building index...');
     var idx=buildIndex(poly);
     setProgress(70,'Scanning for arbs...');
-    var arbs=[],matched=0,priceFail=0,noMatch=0;
+    var arbs=[],matched=0,priceFail=0;
     kalshi.forEach(function(km){
-      var kTitle=(km.title||km.yes_sub_title||km.subtitle||'').trim();
-      if(!kTitle)return;
-      var kYes=getPrice(km,'yes');
-      var kNo=getPrice(km,'no');
-      if(!kYes||!kNo||isNaN(kYes)||isNaN(kNo)){priceFail++;return;}
-      if(kYes<=0.01||kYes>=0.99)return;
-      var r=bestMatch(kTitle,poly,idx,thresh);
-      if(!r.match){noMatch++;return;}
+      var kYes=parseFloat(km.yes_bid_dollars||0);
+      var kNo=parseFloat(km.no_bid_dollars||0);
+      if(!kYes&&km.yes_bid)kYes=parseFloat(km.yes_bid)/100;
+      if(!kNo&&km.no_bid)kNo=parseFloat(km.no_bid)/100;
+      if(!kYes||!kNo||isNaN(kYes)||isNaN(kNo)||kYes<=0.01||kYes>=0.99){priceFail++;return;}
+      var titles=getKalshiTitles(km);
+      var bestR=null;
+      titles.forEach(function(t){
+        var r=bestMatch(t,poly,idx,thresh);
+        if(r.match&&(!bestR||r.sim>bestR.sim)){bestR=r;bestR.usedTitle=t;}
+      });
+      if(!bestR||!bestR.match)return;
       matched++;
-      var pm=r.match;
+      var kTitle=bestR.usedTitle;
+      var pm=bestR.match;
       var pPrices=[];try{pPrices=JSON.parse(pm.outcomePrices||'[]');}catch(e){}
       var pOut=[];try{pOut=JSON.parse(pm.outcomes||'[]');}catch(e){}
       if(pOut.length<2||pPrices.length<2)return;
@@ -260,11 +248,11 @@ async function startScan(){
         var kP=c[0],pP=c[1],kS=c[2],pS=c[3],tot=kP+pP,edge=(1-tot)*100;
         if(edge>=minEdge&&tot<1.0){
           var profit=(bank/tot)-bank;
-          arbs.push({kTitle:kTitle,pTitle:pm.question||pm.title||'',sim:r.sim,edge:edge,roi:(profit/bank)*100,profit:profit,closeTime:km.close_time||pm.endDate,kSide:kS,kPrice:kP,kStake:bank*(kP/tot),pSide:pS,pPrice:pP,pStake:bank*(pP/tot),ticker:km.ticker,slug:pm.slug||pm.id,vol:pm.volume,badge:badge});
+          arbs.push({kTitle:kTitle,pTitle:pm.question||pm.title||'',sim:bestR.sim,edge:edge,roi:(profit/bank)*100,profit:profit,closeTime:km.close_time||pm.endDate,kSide:kS,kPrice:kP,kStake:bank*(kP/tot),pSide:pS,pPrice:pP,pStake:bank*(pP/tot),ticker:km.ticker,slug:pm.slug||pm.id,vol:pm.volume,badge:badge});
         }
       });
     });
-    log('priceFail:'+priceFail+' noMatch:'+noMatch+' matched:'+matched);
+    log('priceFail:'+priceFail+' matched:'+matched+' arbs:'+arbs.length);
     arbs.sort(function(a,b){return b.edge-a.edge;});
     setProgress(100,'Done');
     document.getElementById('prog').style.display='none';
@@ -273,7 +261,6 @@ async function startScan(){
     if(kalshi.length===0)warns+='<div class="warn">⚠️ Kalshi: 0 markets. Try again in 30s.</div>';
     if(poly.length<200)warns+='<div class="warn">⚠️ Polymarket: only '+poly.length+' markets.</div>';
     var h=warns+'<div class="stats">Scan #'+scanCount+' · '+kalshi.length+' Kalshi · '+poly.length+' Poly · '+matched+' matched · '+arbs.length+' arbs · '+now+'</div>';
-    h+='<div class="debug">'+debugLog.join(' | ')+'</div>';
     if(arbs.length){
       h+='<div class="alert-bar">⚡ '+arbs.length+' arb'+(arbs.length>1?'s':'')+' found · '+now+'</div>';
       arbs.forEach(function(x){
@@ -281,8 +268,8 @@ async function startScan(){
         var cd=x.closeTime?new Date(x.closeTime).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}):'';
         h+='<div class="card'+(x.edge>2?' hot':'')+'"><div class="ctop"><div style="flex:1;min-width:0">';
         h+=x.badge;if(sp<50)h+='<span class="sim-badge">⚠️ '+sp+'% match</span>';
-        h+='<div class="gtitle">'+x.kTitle+'</div>';
-        h+='<div class="gtitle" style="color:#666;font-size:11px;margin-top:2px">'+x.pTitle+'</div>';
+        h+='<div class="gtitle">K: '+x.kTitle+'</div>';
+        h+='<div class="gtitle" style="color:#666;font-size:11px;margin-top:2px">P: '+x.pTitle+'</div>';
         if(cd)h+='<div class="close-time">⏱ Closes '+cd+'</div>';
         if(x.vol)h+='<div class="vol">Poly vol $'+Number(x.vol).toLocaleString(undefined,{maximumFractionDigits:0})+'</div>';
         h+='</div><div style="text-align:right;flex-shrink:0"><div class="roi">+'+x.roi.toFixed(2)+'%</div>';
@@ -297,13 +284,13 @@ async function startScan(){
         h+='</div></div></div>';
       });
     }else{
-      h+='<div class="msg">No arbs found above '+minEdge+'%.<br><br>'+matched+' markets matched.</div>';
+      h+='<div class="msg">No arbs found above '+minEdge+'%.<br><br>'+matched+' markets matched between platforms.</div>';
     }
     document.getElementById('out').innerHTML=h;
     setStatus(false,'Scan #'+scanCount+' · '+arbs.length+' arbs · '+now);
   }catch(e){
     document.getElementById('prog').style.display='none';
-    document.getElementById('out').innerHTML='<div class="err">Error: '+e.message+'<br><br>'+debugLog.join('<br>')+'</div>';
+    document.getElementById('out').innerHTML='<div class="err">Error: '+e.message+'</div>';
     setStatus(false,'error');
   }
 }
