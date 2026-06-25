@@ -106,11 +106,7 @@ function setStatus(live,text){document.getElementById('dot').className='tdot'+(l
 function setProgress(pct,text){document.getElementById('progText').textContent=text;document.getElementById('progFill').style.width=pct+'%';}
 
 async function fetchJSON(url){
-  try{
-    var res=await fetch(PROXY+encodeURIComponent(url));
-    if(!res.ok)return null;
-    return await res.json();
-  }catch(e){return null;}
+  try{var res=await fetch(PROXY+encodeURIComponent(url));if(!res.ok)return null;return await res.json();}catch(e){return null;}
 }
 
 function cleanTitle(t){return(t||'').trim().replace(/^(yes|no)\s+/i,'').trim();}
@@ -140,18 +136,15 @@ function similarity(a,b){
   return shared/Math.min(wa.length,wb.size);
 }
 
+// NEW: fetch all Kalshi pages in one worker call - worker handles pagination server-side
 async function fetchKalshi(){
-  var all=[],cursor='';
-  for(var page=0;page<12;page++){
-    var url='https://external-api.kalshi.com/trade-api/v2/markets?status=open&limit=200';
-    if(cursor)url=url+'&cursor='+cursor;
-    setProgress(5+page*2,'Fetching Kalshi... '+all.length+' markets (page '+(page+1)+')');
-    var data=await fetchJSON(url);
-    if(!data||!data.markets||!data.markets.length)break;
-    all=all.concat(data.markets);
-    if(!data.cursor||data.markets.length<200)break;
-    cursor=data.cursor;
+  setProgress(5,'Fetching ALL Kalshi markets via worker...');
+  var data=await fetchJSON('KALSHI_ALL');
+  if(!data||!data.markets){
+    // fallback to single page
+    data=await fetchJSON('https://external-api.kalshi.com/trade-api/v2/markets?status=open&limit=200');
   }
+  var all=data&&data.markets?data.markets:[];
   return all.filter(function(m){return m.status==='active';});
 }
 
@@ -190,6 +183,7 @@ async function startScan(){
   document.getElementById('out').innerHTML='';
   try{
     var kalshi=await fetchKalshi();
+    setProgress(30,'Got '+kalshi.length+' Kalshi markets');
     var poly=await fetchPolymarket();
     setProgress(65,'Building index...');
     var idx=buildIndex(poly);
@@ -225,7 +219,6 @@ async function startScan(){
     var now=new Date().toLocaleTimeString();
     var warns='';
     if(kalshi.length===0)warns+='<div class="warn">⚠️ Kalshi: 0 markets loaded.</div>';
-    if(kalshi.length<400)warns+='<div class="warn">⚠️ Only '+kalshi.length+' Kalshi markets loaded.</div>';
     if(poly.length<200)warns+='<div class="warn">⚠️ Polymarket: only '+poly.length+' markets.</div>';
     var h=warns+'<div class="stats">Scan #'+scanCount+' · '+kalshi.length+' Kalshi · '+poly.length+' Poly · '+matched+' matched · '+arbs.length+' arbs · '+now+'</div>';
     if(arbs.length){
