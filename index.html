@@ -39,6 +39,7 @@ button.scan{background:#00c896;color:#000;border:none;border-radius:8px;padding:
 .err{color:#ff4757;background:rgba(255,71,87,.1);border:1px solid rgba(255,71,87,.3);border-radius:8px;padding:12px;margin-bottom:12px;font-size:13px}
 .warn{color:#f59e0b;background:rgba(245,158,11,.1);border:1px solid rgba(245,158,11,.3);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px}
 .alert-bar{background:rgba(0,200,150,.1);border:1px solid rgba(0,200,150,.3);border-radius:8px;padding:10px 14px;margin-bottom:12px;font-size:12px;color:#00c896}
+.debug{background:#0d1117;border:1px solid #2a2a3d;border-radius:8px;padding:10px;margin-bottom:12px;font-size:10px;color:#666;font-family:monospace;word-break:break-all;max-height:200px;overflow-y:auto}
 .ticker{position:fixed;bottom:0;left:0;right:0;background:#12121a;border-top:1px solid #2a2a3d;padding:10px 16px;display:flex;align-items:center;justify-content:space-between;gap:10px}
 .ticker-info{font-size:12px;color:#666;font-family:monospace;flex:1;min-width:0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
 .tdot{width:8px;height:8px;border-radius:50%;background:#666;display:inline-block;margin-right:6px;flex-shrink:0}
@@ -131,33 +132,21 @@ async function fetchJSON(url,label){
   return null;
 }
 
-var STOP=new Set(['the','and','for','will','this','that','with','from','are','has','was','have','been','who','what','when','where','how','can','not','but','its','they','their','you','may','per','than','more','most','any','all','over','under','does','did','would','should','about','into','there','been','being']);
-
-function norm(s){
+function words(s){
   return(s||'').toLowerCase()
     .replace(/\bbtc\b/g,'bitcoin').replace(/\beth\b/g,'ethereum')
     .replace(/\bsol\b/g,'solana').replace(/\bxrp\b/g,'ripple')
-    .replace(/\bdoge\b/g,'dogecoin').replace(/\bbnb\b/g,'binance')
-    .replace(/\bgop\b/g,'republican').replace(/\bdems?\b/g,'democrat')
-    .replace(/\bpotus\b/g,'president').replace(/\bvp\b/g,'vice president')
-    .replace(/\bdonald\b/g,'trump').replace(/\bkamala\b/g,'harris')
-    .replace(/\bchampionship[s]?\b/g,'champion').replace(/\bwinner[s]?\b/g,'win')
-    .replace(/\bplayoffs?\b/g,'playoff').replace(/\bfederal reserve\b/g,'fed')
-    .replace(/\busa?\b/g,'united states').replace(/\buk\b/g,'united kingdom')
-    .replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim();
+    .replace(/\bgop\b/g,'republican').replace(/\bpotus\b/g,'president')
+    .replace(/[^a-z0-9]/g,' ').split(' ')
+    .filter(function(w){return w.length>2;});
 }
 
-function kw(s){return norm(s).split(' ').filter(function(w){return w.length>1&&!STOP.has(w);});}
-
 function similarity(a,b){
-  var wa=kw(a),wb=kw(b);
-  if(!wa.length||!wb.length)return 0;
-  var setB=new Set(wb),shared=0;
-  wa.forEach(function(w){if(setB.has(w))shared++;});
-  var score=shared/Math.min(wa.length,wb.length);
-  var bonus=0,setA=new Set(wa);
-  setB.forEach(function(w){if(w.length>4&&setA.has(w))bonus+=0.15;});
-  return Math.min(1,score+bonus);
+  var wa=words(a),wb=new Set(words(b));
+  if(!wa.length||!wb.size)return 0;
+  var shared=0;
+  wa.forEach(function(w){if(wb.has(w))shared++;});
+  return shared/Math.min(wa.length,wb.size);
 }
 
 async function fetchKalshi(cats){
@@ -167,23 +156,21 @@ async function fetchKalshi(cats){
     setProgress(5+page*3,'Fetching Kalshi... '+all.length+' markets');
     var data=await fetchJSON(url,'K'+page);
     if(!data||!data.markets||!data.markets.length)break;
+    if(page===0&&data.markets.length>0){
+      var m=data.markets[0];
+      log('K_FIELDS:'+Object.keys(m).join(','));
+      log('K_TITLE:'+m.title);
+      log('K_YES_SUB:'+m.yes_sub_title);
+      log('K_YES_BID:'+m.yes_bid);
+      log('K_NO_BID:'+m.no_bid);
+      log('K_LAST:'+m.last_price);
+      log('K_YES_BID_$:'+m.yes_bid_dollars);
+    }
     all=all.concat(data.markets);
     if(!data.cursor||data.markets.length<200)break;
     cursor=data.cursor;
   }
-  log('Kalshi raw:'+all.length);
-  // Log first market to see field names
-  if(all.length>0)log('K fields:'+Object.keys(all[0]).join(','));
-  return all.filter(function(m){
-    if(m.status!=='active')return false;
-    var c=((m.category||'')+' '+(m.title||'')).toLowerCase();
-    if(cats.indexOf('sports')>-1&&/sport|nba|nfl|mlb|nhl|soccer|tennis|golf|ufc|mma|playoff|champion/.test(c))return true;
-    if(cats.indexOf('politics')>-1&&/polit|elect|senate|congress|president|vote|democrat|republican|trump|harris/.test(c))return true;
-    if(cats.indexOf('crypto')>-1&&/crypto|bitcoin|btc|eth|solana|xrp|coin|token|blockchain/.test(c))return true;
-    if(cats.indexOf('economics')>-1&&/econ|financ|fed|rate|inflation|gdp|unemploy|cpi|stock|nasdaq|dow/.test(c))return true;
-    if(cats.indexOf('other')>-1)return true;
-    return cats.length===0;
-  });
+  return all.filter(function(m){return m.status==='active';});
 }
 
 async function fetchPolymarket(){
@@ -193,38 +180,39 @@ async function fetchPolymarket(){
     setProgress(35+page*2,'Fetching Polymarket... '+all.length+' markets');
     var data=await fetchJSON(url,'P'+page);
     if(!data||!Array.isArray(data)||!data.length)break;
+    if(page===0&&data.length>0){
+      var pm=data[0];
+      log('P_FIELDS:'+Object.keys(pm).join(','));
+      log('P_QUESTION:'+pm.question);
+      log('P_PRICES:'+pm.outcomePrices);
+    }
     all=all.concat(data);
     offset+=100;
     if(data.length<100)break;
   }
-  log('Poly raw:'+all.length);
-  if(all.length>0)log('P fields:'+Object.keys(all[0]).join(','));
   return all.filter(function(m){return m.active&&!m.closed&&m.outcomePrices&&m.outcomes;});
 }
 
-function kalshiPrice(m,side){
-  // Kalshi API returns prices in cents as integers (0-99)
-  // Fields: yes_bid, yes_ask, no_bid, no_ask, last_price
-  // Also sometimes: yes_bid_dollars (float) depending on API version
+function getPrice(m,side){
   if(side==='yes'){
-    if(m.yes_bid_dollars!=null)return parseFloat(m.yes_bid_dollars);
-    if(m.yes_bid!=null)return parseFloat(m.yes_bid)/100;
-    if(m.last_price!=null)return parseFloat(m.last_price)/100;
+    if(m.yes_bid_dollars!=null&&m.yes_bid_dollars>0)return parseFloat(m.yes_bid_dollars);
+    if(m.yes_bid!=null&&m.yes_bid>0)return parseFloat(m.yes_bid)/100;
+    if(m.last_price!=null&&m.last_price>0)return parseFloat(m.last_price)/100;
   }else{
-    if(m.no_bid_dollars!=null)return parseFloat(m.no_bid_dollars);
-    if(m.no_bid!=null)return parseFloat(m.no_bid)/100;
-    if(m.last_price!=null)return 1-(parseFloat(m.last_price)/100);
+    if(m.no_bid_dollars!=null&&m.no_bid_dollars>0)return parseFloat(m.no_bid_dollars);
+    if(m.no_bid!=null&&m.no_bid>0)return parseFloat(m.no_bid)/100;
+    if(m.last_price!=null&&m.last_price>0)return 1-(parseFloat(m.last_price)/100);
   }
   return 0;
 }
 
 function catBadge(t){t=(t||'').toLowerCase();if(/nba|nfl|mlb|nhl|wnba|soccer|tennis|golf|ufc|mma|epl|world cup|champion|playoff|super bowl/.test(t))return'<span class="catbadge cat-sports">🏆 Sports</span>';if(/bitcoin|btc|eth|crypto|coin|token|blockchain|sol|xrp/.test(t))return'<span class="catbadge cat-crypto">₿ Crypto</span>';if(/elect|president|senate|congress|governor|vote|democrat|republican|trump|harris/.test(t))return'<span class="catbadge cat-politics">🗳️ Politics</span>';if(/fed|rate|inflation|gdp|unemploy|cpi|economic|stock|dow|nasdaq/.test(t))return'<span class="catbadge cat-economics">📈 Economics</span>';return'<span class="catbadge cat-other">🌐 Other</span>';}
 
-function buildIndex(markets){var idx={};markets.forEach(function(m,i){kw(m.question||m.title||'').forEach(function(w){if(!idx[w])idx[w]=[];idx[w].push(i);});});return idx;}
+function buildIndex(markets){var idx={};markets.forEach(function(m,i){words(m.question||m.title||'').forEach(function(w){if(!idx[w])idx[w]=[];idx[w].push(i);});});return idx;}
 
 function bestMatch(title,markets,idx,thresh){
   var hits={};
-  kw(title).forEach(function(w){if(idx[w])idx[w].forEach(function(i){hits[i]=(hits[i]||0)+1;});});
+  words(title).forEach(function(w){if(idx[w])idx[w].forEach(function(i){hits[i]=(hits[i]||0)+1;});});
   var best=null,bestS=0;
   Object.keys(hits).forEach(function(i){
     var s=similarity(title,markets[i].question||markets[i].title||'');
@@ -250,16 +238,16 @@ async function startScan(){
     setProgress(65,'Building index...');
     var idx=buildIndex(poly);
     setProgress(70,'Scanning for arbs...');
-    var arbs=[],matched=0,skippedPrice=0;
+    var arbs=[],matched=0,priceFail=0,noMatch=0;
     kalshi.forEach(function(km){
-      // FIX 1: use km.title (full question), not km.yes_sub_title (short fragment)
-      var kTitle=(km.title||km.yes_sub_title||'').trim();
-      // FIX 2: use kalshiPrice() which handles both cents and dollars field formats
-      var kYes=kalshiPrice(km,'yes');
-      var kNo=kalshiPrice(km,'no');
-      if(!kYes||!kNo||kYes<=0.01||kYes>=0.99){skippedPrice++;return;}
+      var kTitle=(km.title||km.yes_sub_title||km.subtitle||'').trim();
+      if(!kTitle)return;
+      var kYes=getPrice(km,'yes');
+      var kNo=getPrice(km,'no');
+      if(!kYes||!kNo||isNaN(kYes)||isNaN(kNo)){priceFail++;return;}
+      if(kYes<=0.01||kYes>=0.99)return;
       var r=bestMatch(kTitle,poly,idx,thresh);
-      if(!r.match)return;
+      if(!r.match){noMatch++;return;}
       matched++;
       var pm=r.match;
       var pPrices=[];try{pPrices=JSON.parse(pm.outcomePrices||'[]');}catch(e){}
@@ -276,15 +264,16 @@ async function startScan(){
         }
       });
     });
-    log('skippedPrice:'+skippedPrice+' matched:'+matched);
+    log('priceFail:'+priceFail+' noMatch:'+noMatch+' matched:'+matched);
     arbs.sort(function(a,b){return b.edge-a.edge;});
     setProgress(100,'Done');
     document.getElementById('prog').style.display='none';
     var now=new Date().toLocaleTimeString();
     var warns='';
-    if(kalshi.length===0)warns+='<div class="warn">⚠️ Kalshi: 0 markets. Try again in 30 seconds.</div>';
-    if(poly.length<200)warns+='<div class="warn">⚠️ Polymarket: only '+poly.length+' markets loaded.</div>';
+    if(kalshi.length===0)warns+='<div class="warn">⚠️ Kalshi: 0 markets. Try again in 30s.</div>';
+    if(poly.length<200)warns+='<div class="warn">⚠️ Polymarket: only '+poly.length+' markets.</div>';
     var h=warns+'<div class="stats">Scan #'+scanCount+' · '+kalshi.length+' Kalshi · '+poly.length+' Poly · '+matched+' matched · '+arbs.length+' arbs · '+now+'</div>';
+    h+='<div class="debug">'+debugLog.join(' | ')+'</div>';
     if(arbs.length){
       h+='<div class="alert-bar">⚡ '+arbs.length+' arb'+(arbs.length>1?'s':'')+' found · '+now+'</div>';
       arbs.forEach(function(x){
@@ -308,13 +297,13 @@ async function startScan(){
         h+='</div></div></div>';
       });
     }else{
-      h+='<div class="msg">No arbs found above '+minEdge+'%.<br><br>'+matched+' markets matched.<br><br>Try lowering Min % to 0 or similarity to 0.05.</div>';
+      h+='<div class="msg">No arbs found above '+minEdge+'%.<br><br>'+matched+' markets matched.</div>';
     }
     document.getElementById('out').innerHTML=h;
     setStatus(false,'Scan #'+scanCount+' · '+arbs.length+' arbs · '+now);
   }catch(e){
     document.getElementById('prog').style.display='none';
-    document.getElementById('out').innerHTML='<div class="err">Error: '+e.message+'<br><small>'+debugLog.slice(-5).join(' | ')+'</small></div>';
+    document.getElementById('out').innerHTML='<div class="err">Error: '+e.message+'<br><br>'+debugLog.join('<br>')+'</div>';
     setStatus(false,'error');
   }
 }
